@@ -506,3 +506,7 @@ class CourseDetailScreen extends StatelessWidget {
 }
 
 
+
+
+
+

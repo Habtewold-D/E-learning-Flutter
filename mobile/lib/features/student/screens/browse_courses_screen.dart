@@ -354,3 +354,7 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
 }
 
 
+
+
+
+
