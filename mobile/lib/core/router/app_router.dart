@@ -1,39 +1,80 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/register_screen.dart';
+import '../../features/auth/screens/teacher_home_screen.dart';
+import '../../features/auth/screens/student_home_screen.dart';
+import '../../features/auth/providers/auth_provider.dart';
 
-// Import screens (will be created later)
-// import '../../features/auth/screens/login_screen.dart';
-// import '../../features/auth/screens/register_screen.dart';
-// import '../../features/courses/screens/courses_list_screen.dart';
+final routerProvider = Provider<GoRouter>((ref) {
+  // Watch auth state to trigger router rebuilds
+  ref.watch(authProvider);
+  
+  // Create a refresh notifier that will trigger router rebuilds
+  final refreshNotifier = GoRouterRefreshStream(ref);
 
-class AppRouter {
-  static final GoRouter router = GoRouter(
+  return GoRouter(
     initialLocation: '/login',
+    refreshListenable: refreshNotifier,
+    redirect: (context, state) {
+      final currentAuthState = ref.read(authProvider);
+      final isAuthenticated = currentAuthState.isAuthenticated;
+      final isLoginPage = state.uri.path == '/login' || state.uri.path == '/register';
+      final isHomePage = state.uri.path == '/teacher-home' || state.uri.path == '/student-home';
+
+      // If not authenticated and trying to access protected route
+      if (!isAuthenticated && !isLoginPage) {
+        return '/login';
+      }
+
+      // If authenticated and on login/register page, redirect to appropriate home
+      if (isAuthenticated && isLoginPage) {
+        if (currentAuthState.isTeacher) {
+          return '/teacher-home';
+        } else {
+          return '/student-home';
+        }
+      }
+
+      // If authenticated and accessing home, ensure correct role-based home
+      if (isAuthenticated && isHomePage) {
+        if (currentAuthState.isTeacher && state.uri.path == '/student-home') {
+          return '/teacher-home';
+        }
+        if (currentAuthState.isStudent && state.uri.path == '/teacher-home') {
+          return '/student-home';
+        }
+      }
+
+      return null; // No redirect needed
+    },
     routes: [
-      // Auth Routes
+      // Auth Routes (public)
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const Scaffold(
-          body: Center(child: Text('Login Screen - Coming Soon')),
-        ),
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         path: '/register',
         name: 'register',
-        builder: (context, state) => const Scaffold(
-          body: Center(child: Text('Register Screen - Coming Soon')),
-        ),
+        builder: (context, state) => const RegisterScreen(),
       ),
-      
-      // Home/Courses Routes
+
+      // Home Routes (protected, role-based)
       GoRoute(
-        path: '/home',
-        name: 'home',
-        builder: (context, state) => const Scaffold(
-          body: Center(child: Text('Home Screen - Coming Soon')),
-        ),
+        path: '/teacher-home',
+        name: 'teacher-home',
+        builder: (context, state) => const TeacherHomeScreen(),
       ),
+      GoRoute(
+        path: '/student-home',
+        name: 'student-home',
+        builder: (context, state) => const StudentHomeScreen(),
+      ),
+
+      // Courses Routes (will be implemented later)
       GoRoute(
         path: '/courses',
         name: 'courses',
@@ -52,8 +93,8 @@ class AppRouter {
           );
         },
       ),
-      
-      // Exams Routes
+
+      // Exams Routes (will be implemented later)
       GoRoute(
         path: '/exams/:courseId',
         name: 'exams',
@@ -76,8 +117,8 @@ class AppRouter {
           );
         },
       ),
-      
-      // RAG Route
+
+      // RAG Route (will be implemented later)
       GoRoute(
         path: '/rag/:contentId',
         name: 'rag',
@@ -89,8 +130,8 @@ class AppRouter {
           );
         },
       ),
-      
-      // Live Class Route
+
+      // Live Class Route (will be implemented later)
       GoRoute(
         path: '/live/:roomName',
         name: 'live-class',
@@ -113,14 +154,28 @@ class AppRouter {
             Text('Page not found: ${state.uri}'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => context.go('/home'),
-              child: const Text('Go Home'),
+              onPressed: () => context.go('/login'),
+              child: const Text('Go to Login'),
             ),
           ],
         ),
       ),
     ),
   );
+});
+
+// Helper class to make router refresh when auth state changes
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Ref ref) {
+    // Listen to auth state changes and notify router
+    ref.listen<AuthState>(
+      authProvider,
+      (previous, next) {
+        // Only notify if authentication status changed
+        if (previous?.isAuthenticated != next.isAuthenticated) {
+          notifyListeners();
+        }
+      },
+    );
+  }
 }
-
-

@@ -4,7 +4,8 @@ class AppConstants {
   // - Android Emulator: http://10.0.2.2:8000
   // - iOS Simulator: http://localhost:8000
   // - Physical Device: http://YOUR_IP:8000
-  static const String baseUrl = 'http://10.0.2.2:8000/api';
+  // Your current IP: 192.168.8.9
+  static const String baseUrl = 'http://192.168.8.9:8000/api';
   
   // Storage Keys
   static const String tokenKey = 'auth_token';
