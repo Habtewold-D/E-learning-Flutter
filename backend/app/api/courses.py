@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
@@ -7,10 +7,12 @@ from app.models.course import Course, CourseContent, ContentType
 from app.schemas.course import CourseCreate, CourseResponse, ContentCreate, ContentResponse, CourseWithContent
 from app.api.dependencies import get_current_user
 from app.services.file_service import save_uploaded_file
+from app.services.rag_service import RAGService
 import os
 from app.core.config import settings
 
 router = APIRouter()
+rag_service = RAGService()
 
 
 @router.post("/", response_model=CourseResponse)
@@ -62,10 +64,11 @@ async def upload_content(
     course_id: int,
     title: str = Form(...),
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Upload course content (video or PDF)."""
+    """Upload course content (video or PDF). PDFs are automatically processed for RAG in background."""
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -102,6 +105,18 @@ async def upload_content(
     db.add(new_content)
     db.commit()
     db.refresh(new_content)
+    
+    # Auto-process PDF for RAG in background (non-blocking)
+    if content_type == ContentType.PDF:
+        async def process_pdf_background():
+            try:
+                await rag_service.process_pdf(file_url, new_content.id)
+                print(f"Successfully processed PDF for RAG: content_id={new_content.id}")
+            except Exception as e:
+                print(f"Error processing PDF for RAG (content_id={new_content.id}): {e}")
+                # Don't fail the upload if RAG processing fails
+        
+        background_tasks.add_task(process_pdf_background)
     
     return ContentResponse.model_validate(new_content)
 

@@ -22,24 +22,30 @@ class RAGQuestionResponse(BaseModel):
     sources: list[str] = []
 
 
-@router.post("/upload-pdf")
-async def upload_pdf_for_rag(
-    course_content_id: int = Form(...),
-    file: UploadFile = File(...),
+@router.post("/process/{course_content_id}")
+async def process_existing_pdf_for_rag(
+    course_content_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Upload a PDF for RAG processing."""
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="File must be a PDF")
+    """Process an existing PDF course content for RAG (manual reprocessing)."""
+    from app.models.course import CourseContent
     
-    # Save file
-    file_url = await save_uploaded_file(file, course_content_id, ContentType.PDF)
+    # Get the course content
+    content = db.query(CourseContent).filter(CourseContent.id == course_content_id).first()
+    if not content:
+        raise HTTPException(status_code=404, detail="Course content not found")
     
-    # Process PDF for RAG
+    if content.type != ContentType.PDF:
+        raise HTTPException(status_code=400, detail="Content must be a PDF")
+    
+    # Process PDF for RAG using the existing file
     try:
-        await rag_service.process_pdf(file_url, course_content_id)
-        return {"message": "PDF processed successfully", "content_id": course_content_id}
+        await rag_service.process_pdf(content.url, course_content_id)
+        return {
+            "message": "PDF processed successfully for RAG",
+            "content_id": course_content_id
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
