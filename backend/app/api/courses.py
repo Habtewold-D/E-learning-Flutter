@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
@@ -60,8 +60,7 @@ async def get_course(course_id: int, db: Session = Depends(get_db)):
 @router.post("/{course_id}/content", response_model=ContentResponse)
 async def upload_content(
     course_id: int,
-    title: str,
-    type: ContentType,
+    title: str = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -74,19 +73,29 @@ async def upload_content(
     if course.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only course teacher can upload content")
     
-    # Validate file type
-    if type == ContentType.PDF and not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="File must be a PDF")
-    if type == ContentType.VIDEO and not any(file.filename.endswith(ext) for ext in ['.mp4', '.mov', '.avi']):
-        raise HTTPException(status_code=400, detail="File must be a video")
+    # Auto-detect file type from extension
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File must have a filename")
+    
+    file_extension = file.filename.lower().split('.')[-1] if '.' in file.filename else ''
+    
+    if file_extension == 'pdf':
+        content_type = ContentType.PDF
+    elif file_extension in ['mp4', 'mov', 'avi', 'mkv', 'webm']:
+        content_type = ContentType.VIDEO
+    else:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file type. Supported: PDF (.pdf) or Video (.mp4, .mov, .avi, .mkv, .webm)"
+        )
     
     # Save file
-    file_url = await save_uploaded_file(file, course_id, type)
+    file_url = await save_uploaded_file(file, course_id, content_type)
     
     # Create content record
     new_content = CourseContent(
         course_id=course_id,
-        type=type,
+        type=content_type,
         title=title,
         url=file_url
     )
