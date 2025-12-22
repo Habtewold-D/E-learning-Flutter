@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.core.database import get_db
@@ -24,7 +24,7 @@ class RAGQuestionResponse(BaseModel):
 
 @router.post("/upload-pdf")
 async def upload_pdf_for_rag(
-    course_content_id: int,
+    course_content_id: int = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
