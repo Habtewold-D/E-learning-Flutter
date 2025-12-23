@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../../../core/router/app_router.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -24,51 +26,93 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    if (_formKey.currentState!.validate()) {
-      final success = await ref.read(authProvider.notifier).login(
-            _emailController.text.trim(),
-            _passwordController.text,
-          );
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      if (mounted) {
-        if (success) {
-          // Wait for state to update
-          await Future.delayed(const Duration(milliseconds: 200));
-          
-          // Check auth state and navigate
-          final authState = ref.read(authProvider);
-          if (authState.isAuthenticated) {
-            // Clear form
-            _emailController.clear();
-            _passwordController.clear();
-            
-            // Navigate based on role
-            if (authState.isTeacher) {
-              context.go('/teacher-home');
-            } else {
-              context.go('/student-home');
-            }
-          } else {
-            // Show error if authentication didn't work
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Authentication failed. Please try again.'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        } else {
-          final error = ref.read(authProvider).error;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error ?? 'Login failed'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+    // Don't clear form yet - wait for result
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    print('Starting login for: $email');
+    
+    // Get router and messenger from provider/context before async call
+    final router = ref.read(routerProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final targetRoute = email.contains('teacher') ? '/teacher-home' : '/student-home'; // We'll update this after login
+    
+    try {
+      final user = await ref.read(authProvider.notifier).login(email, password);
+      print('Login call completed, user: ${user?.email}');
+
+      if (user != null) {
+        print('Login successful, showing success message and navigating');
+        print('User role: ${user.role}, isTeacher: ${user.isTeacher}');
+        
+        // Determine target route based on user role
+        final finalTargetRoute = user.isTeacher ? '/teacher-home' : '/student-home';
+        
+        // Clear form first (before navigation/disposal)
+        if (mounted) {
+          _emailController.clear();
+          _passwordController.clear();
         }
+        
+        // Show success message
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Login successful!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        // Let the router's redirect function handle navigation automatically
+        // The GoRouterRefreshStream will trigger a redirect when auth state changes
+        // Just wait for the router to refresh and redirect
+        print('Waiting for router to automatically redirect based on auth state...');
+      } else {
+        // Login failed - get error from state if possible
+        String errorMessage = 'Login failed. Please try again.';
+        if (mounted) {
+          try {
+            final authState = ref.read(authProvider);
+            errorMessage = authState.error ?? errorMessage;
+          } catch (e) {
+            // Widget disposed, use default message
+            print('Could not read error from state: $e');
+          }
+        }
+        print('Showing error message: $errorMessage');
+        
+        // Use captured messenger to show error
+        messenger.clearSnackBars();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                messenger.hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+        // Don't clear form on error - user can retry
       }
+    } catch (e, stackTrace) {
+      print('Exception in _handleLogin: $e');
+      print('Stack trace: $stackTrace');
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Unexpected error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
   }
 

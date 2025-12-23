@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../../../core/router/app_router.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -30,55 +32,88 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
-    if (_formKey.currentState!.validate()) {
-      final success = await ref.read(authProvider.notifier).register(
-            _emailController.text.trim(),
-            _passwordController.text,
-            _nameController.text.trim(),
-            _selectedRole,
-          );
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
+    // Don't clear form yet - wait for result
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final name = _nameController.text.trim();
+
+    // Get router and messenger from provider/context before async call
+    final router = ref.read(routerProvider);
+    final messenger = ScaffoldMessenger.of(context);
+
+    print('Starting registration for: $email, role: $_selectedRole');
+    final user = await ref.read(authProvider.notifier).register(
+          email,
+          password,
+          name,
+          _selectedRole,
+        );
+
+    print('Registration call completed, user: ${user?.email}');
+
+    if (user != null) {
+      print('Registration successful, showing success message and navigating');
+      print('User role: ${user.role}, isTeacher: ${user.isTeacher}');
+      
+      // Determine target route based on user role
+      final finalTargetRoute = user.isTeacher ? '/teacher-home' : '/student-home';
+      
+      // Clear form first (before navigation/disposal)
       if (mounted) {
-        if (success) {
-          // Wait for state to update
-          await Future.delayed(const Duration(milliseconds: 200));
-          
-          // Check auth state and navigate
+        _nameController.clear();
+        _emailController.clear();
+        _passwordController.clear();
+        _confirmPasswordController.clear();
+      }
+      
+      // Show success message
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // Let the router's redirect function handle navigation automatically
+      // The GoRouterRefreshStream will trigger a redirect when auth state changes
+      // Just wait for the router to refresh and redirect
+      print('Waiting for router to automatically redirect based on auth state...');
+    } else {
+      // Registration failed - get error from state if possible
+      String errorMessage = 'Registration failed. Please try again.';
+      if (mounted) {
+        try {
           final authState = ref.read(authProvider);
-          if (authState.isAuthenticated) {
-            // Clear form
-            _nameController.clear();
-            _emailController.clear();
-            _passwordController.clear();
-            _confirmPasswordController.clear();
-            
-            // Navigate based on role
-            if (authState.isTeacher) {
-              context.go('/teacher-home');
-            } else {
-              context.go('/student-home');
-            }
-          } else {
-            // Show error if authentication didn't work
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Registration failed. Please try again.'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        } else {
-          final error = ref.read(authProvider).error;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error ?? 'Registration failed'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          errorMessage = authState.error ?? errorMessage;
+        } catch (e) {
+          // Widget disposed, use default message
+          print('Could not read error from state: $e');
         }
       }
+      print('Showing error: $errorMessage');
+      
+      // Use captured messenger to show error
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {
+              messenger.hideCurrentSnackBar();
+            },
+          ),
+        ),
+      );
+      // Don't clear form on error - user can retry
     }
   }
 

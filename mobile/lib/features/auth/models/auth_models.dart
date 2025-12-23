@@ -52,9 +52,17 @@ class AuthResponse {
   });
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
+    // Handle both snake_case (from FastAPI) and camelCase
+    final accessToken = json['access_token'] as String? ?? json['accessToken'] as String?;
+    final tokenType = json['token_type'] as String? ?? json['tokenType'] as String? ?? 'bearer';
+    
+    if (accessToken == null) {
+      throw FormatException('Missing access_token in response');
+    }
+    
     return AuthResponse(
-      accessToken: json['access_token'] as String,
-      tokenType: json['token_type'] as String? ?? 'bearer',
+      accessToken: accessToken,
+      tokenType: tokenType,
       user: User.fromJson(json['user'] as Map<String, dynamic>),
     );
   }

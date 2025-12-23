@@ -23,13 +23,32 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoginPage = state.uri.path == '/login' || state.uri.path == '/register';
       final isHomePage = state.uri.path == '/teacher-home' || state.uri.path == '/student-home';
 
+      print('Router redirect: path=${state.uri.path}, authenticated=$isAuthenticated, user=${currentAuthState.user?.role}');
+
       // If not authenticated and trying to access protected route
       if (!isAuthenticated && !isLoginPage) {
+        print('Redirecting to login (not authenticated)');
         return '/login';
+      }
+
+      // If authenticated and accessing home, ensure correct role-based home
+      if (isAuthenticated && isHomePage) {
+        if (currentAuthState.isTeacher && state.uri.path == '/student-home') {
+          print('Redirecting teacher to teacher-home');
+          return '/teacher-home';
+        }
+        if (currentAuthState.isStudent && state.uri.path == '/teacher-home') {
+          print('Redirecting student to student-home');
+          return '/student-home';
+        }
+        // If role matches, allow navigation
+        print('Allowing navigation to ${state.uri.path}');
+        return null;
       }
 
       // If authenticated and on login/register page, redirect to appropriate home
       if (isAuthenticated && isLoginPage) {
+        print('Authenticated on login page, redirecting to home');
         if (currentAuthState.isTeacher) {
           return '/teacher-home';
         } else {
@@ -37,16 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      // If authenticated and accessing home, ensure correct role-based home
-      if (isAuthenticated && isHomePage) {
-        if (currentAuthState.isTeacher && state.uri.path == '/student-home') {
-          return '/teacher-home';
-        }
-        if (currentAuthState.isStudent && state.uri.path == '/teacher-home') {
-          return '/student-home';
-        }
-      }
-
+      print('No redirect needed');
       return null; // No redirect needed
     },
     routes: [
@@ -171,8 +181,14 @@ class GoRouterRefreshStream extends ChangeNotifier {
     ref.listen<AuthState>(
       authProvider,
       (previous, next) {
+        print('GoRouterRefreshStream: Auth state changed - previous: ${previous?.isAuthenticated}, next: ${next.isAuthenticated}');
         // Only notify if authentication status changed
         if (previous?.isAuthenticated != next.isAuthenticated) {
+          print('GoRouterRefreshStream: Notifying router of auth state change');
+          notifyListeners();
+        } else if (previous?.user?.role != next.user?.role) {
+          // Also notify if user role changed (e.g., after login)
+          print('GoRouterRefreshStream: User role changed, notifying router');
           notifyListeners();
         }
       },

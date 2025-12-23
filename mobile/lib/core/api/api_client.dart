@@ -42,7 +42,8 @@ class ApiClient {
         options: options,
       );
     } on DioException catch (e) {
-      throw _handleError(e);
+      // Re-throw DioException so caller can extract error details
+      rethrow;
     }
   }
 
@@ -61,7 +62,8 @@ class ApiClient {
         options: options,
       );
     } on DioException catch (e) {
-      throw _handleError(e);
+      // Re-throw DioException so caller can extract error details
+      rethrow;
     }
   }
 
@@ -80,7 +82,8 @@ class ApiClient {
         options: options,
       );
     } on DioException catch (e) {
-      throw _handleError(e);
+      // Re-throw DioException so caller can extract error details
+      rethrow;
     }
   }
 
@@ -97,7 +100,8 @@ class ApiClient {
         options: options,
       );
     } on DioException catch (e) {
-      throw _handleError(e);
+      // Re-throw DioException so caller can extract error details
+      rethrow;
     }
   }
 
@@ -121,48 +125,9 @@ class ApiClient {
             ),
       );
     } on DioException catch (e) {
-      throw _handleError(e);
+      // Re-throw DioException so caller can extract error details
+      rethrow;
     }
-  }
-
-  String _handleError(DioException error) {
-    String errorMessage = 'An error occurred';
-    
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        errorMessage = 'Connection timeout. Please check your internet connection.';
-        break;
-      case DioExceptionType.badResponse:
-        if (error.response != null) {
-          final statusCode = error.response!.statusCode;
-          final data = error.response!.data;
-          
-          if (statusCode == 401) {
-            errorMessage = 'Unauthorized. Please login again.';
-          } else if (statusCode == 403) {
-            errorMessage = 'Access denied.';
-          } else if (statusCode == 404) {
-            errorMessage = 'Resource not found.';
-          } else if (statusCode == 500) {
-            errorMessage = 'Server error. Please try again later.';
-          } else {
-            errorMessage = data['detail'] ?? 'An error occurred';
-          }
-        }
-        break;
-      case DioExceptionType.cancel:
-        errorMessage = 'Request cancelled.';
-        break;
-      case DioExceptionType.unknown:
-        errorMessage = 'No internet connection. Please check your network.';
-        break;
-      default:
-        errorMessage = 'An unexpected error occurred.';
-    }
-    
-    return errorMessage;
   }
 }
 
