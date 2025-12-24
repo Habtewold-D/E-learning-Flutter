@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
-class TeacherDrawer extends ConsumerWidget {
-  const TeacherDrawer({super.key});
+class StudentDrawer extends ConsumerWidget {
+  const StudentDrawer({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,8 +20,8 @@ class TeacherDrawer extends ConsumerWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Theme.of(context).colorScheme.primary,
-                  Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                  Theme.of(context).colorScheme.secondary,
+                  Theme.of(context).colorScheme.secondary.withOpacity(0.7),
                 ],
               ),
             ),
@@ -33,17 +33,17 @@ class TeacherDrawer extends ConsumerWidget {
                   radius: 30,
                   backgroundColor: Colors.white,
                   child: Text(
-                    user?.name?.substring(0, 1).toUpperCase() ?? 'T',
+                    user?.name?.substring(0, 1).toUpperCase() ?? 'S',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: Theme.of(context).colorScheme.secondary,
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  user?.name ?? 'Teacher',
+                  user?.name ?? 'Student',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -66,7 +66,7 @@ class TeacherDrawer extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
-                    'Teacher',
+                    'Student',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -77,7 +77,7 @@ class TeacherDrawer extends ConsumerWidget {
               ],
             ),
           ),
-          
+
           // Menu Items
           _buildDrawerItem(
             context,
@@ -85,7 +85,7 @@ class TeacherDrawer extends ConsumerWidget {
             title: 'Home',
             onTap: () {
               Navigator.pop(context);
-              context.go('/teacher/home');
+              context.go('/student/home');
             },
           ),
           _buildDrawerItem(
@@ -94,16 +94,25 @@ class TeacherDrawer extends ConsumerWidget {
             title: 'My Courses',
             onTap: () {
               Navigator.pop(context);
-              context.go('/teacher/courses');
+              context.go('/student/courses');
             },
           ),
           _buildDrawerItem(
             context,
-            icon: Icons.add_circle_outline,
-            title: 'Create Course',
+            icon: Icons.explore,
+            title: 'Browse Courses',
             onTap: () {
               Navigator.pop(context);
-              context.push('/teacher/create-course');
+              context.go('/student/browse');
+            },
+          ),
+          _buildDrawerItem(
+            context,
+            icon: Icons.quiz,
+            title: 'Exams',
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/student/exams');
             },
           ),
           _buildDrawerItem(
@@ -112,16 +121,7 @@ class TeacherDrawer extends ConsumerWidget {
             title: 'Live Classes',
             onTap: () {
               Navigator.pop(context);
-              context.go('/teacher/live');
-            },
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.quiz,
-            title: 'Exams Management',
-            onTap: () {
-              Navigator.pop(context);
-              context.go('/teacher/exams');
+              context.go('/student/live');
             },
           ),
           const Divider(),
@@ -131,7 +131,7 @@ class TeacherDrawer extends ConsumerWidget {
             title: 'Profile',
             onTap: () {
               Navigator.pop(context);
-              context.go('/teacher/profile');
+              context.go('/student/profile');
             },
           ),
           _buildDrawerItem(
@@ -140,7 +140,6 @@ class TeacherDrawer extends ConsumerWidget {
             title: 'Settings',
             onTap: () {
               Navigator.pop(context);
-              // Settings screen can be added later
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Settings coming soon')),
               );
@@ -173,7 +172,7 @@ class TeacherDrawer extends ConsumerWidget {
     Color? textColor,
   }) {
     return ListTile(
-      leading: Icon(icon, color: textColor ?? Theme.of(context).colorScheme.primary),
+      leading: Icon(icon, color: textColor ?? Theme.of(context).colorScheme.secondary),
       title: Text(
         title,
         style: TextStyle(color: textColor),

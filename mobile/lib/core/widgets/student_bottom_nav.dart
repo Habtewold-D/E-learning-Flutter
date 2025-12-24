@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-class TeacherBottomNav extends StatelessWidget {
+class StudentBottomNav extends StatelessWidget {
   final int currentIndex;
 
-  const TeacherBottomNav({
+  const StudentBottomNav({
     super.key,
     required this.currentIndex,
   });
@@ -17,16 +17,16 @@ class TeacherBottomNav extends StatelessWidget {
       onTap: (index) {
         switch (index) {
           case 0:
-            context.go('/teacher/home');
+            context.go('/student/home');
             break;
           case 1:
-            context.go('/teacher/courses');
+            context.go('/student/courses');
             break;
           case 2:
-            context.go('/teacher/live');
+            context.go('/student/browse');
             break;
           case 3:
-            context.go('/teacher/profile');
+            context.go('/student/profile');
             break;
         }
       },
@@ -37,11 +37,11 @@ class TeacherBottomNav extends StatelessWidget {
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.book),
-          label: 'Courses',
+          label: 'My Courses',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.video_call),
-          label: 'Live',
+          icon: Icon(Icons.explore),
+          label: 'Browse',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.person),

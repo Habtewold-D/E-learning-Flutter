@@ -3,13 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
-import '../../features/auth/screens/student_home_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
+// Student screens
+import '../../features/student/screens/student_home_screen.dart';
+import '../../features/student/screens/my_courses_screen.dart' as student;
+import '../../features/student/screens/browse_courses_screen.dart';
+import '../../features/student/screens/course_detail_screen.dart' as student_course;
+import '../../features/student/screens/content_viewer_screen.dart';
+import '../../features/student/screens/exams_list_screen.dart';
+import '../../features/student/screens/take_exam_screen.dart';
+import '../../features/student/screens/exam_results_screen.dart';
+import '../../features/student/screens/rag_chat_screen.dart';
+import '../../features/student/screens/live_classes_screen.dart';
+import '../../features/student/screens/student_profile_screen.dart';
 // Teacher screens
 import '../../features/teacher/screens/teacher_home_screen.dart';
-import '../../features/teacher/screens/my_courses_screen.dart';
+import '../../features/teacher/screens/my_courses_screen.dart' as teacher;
 import '../../features/teacher/screens/create_course_screen.dart';
-import '../../features/teacher/screens/course_detail_screen.dart';
+import '../../features/teacher/screens/course_detail_screen.dart' as teacher_course;
 import '../../features/teacher/screens/upload_content_screen.dart';
 import '../../features/teacher/screens/create_exam_screen.dart';
 import '../../features/teacher/screens/exams_management_screen.dart';
@@ -35,7 +46,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoginPage = state.uri.path == '/login' || state.uri.path == '/register';
       final isHomePage = state.uri.path == '/teacher-home' || 
                          state.uri.path == '/teacher/home' ||
-                         state.uri.path == '/student-home';
+                         state.uri.path == '/student-home' ||
+                         state.uri.path == '/student/home';
       final isTeacherRoute = state.uri.path.startsWith('/teacher');
       final isStudentRoute = state.uri.path.startsWith('/student');
 
@@ -57,7 +69,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         // Student trying to access teacher routes
         if (currentAuthState.isStudent && isTeacherRoute) {
           print('Redirecting student from teacher route to student home');
-          return '/student-home';
+          return '/student/home';
         }
       }
 
@@ -69,7 +81,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
         if (currentAuthState.isStudent && (state.uri.path == '/teacher-home' || state.uri.path == '/teacher/home')) {
           print('Redirecting student to student-home');
-          return '/student-home';
+          return '/student/home';
         }
         // If role matches, allow navigation
         print('Allowing navigation to ${state.uri.path}');
@@ -82,7 +94,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (currentAuthState.isTeacher) {
           return '/teacher/home';
         } else {
-          return '/student-home';
+          return '/student/home';
         }
       }
 
@@ -109,8 +121,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/student-home',
-        name: 'student-home',
-        builder: (context, state) => const StudentHomeScreen(),
+        redirect: (context, state) => '/student/home',
       ),
 
       // Teacher Routes
@@ -126,7 +137,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/teacher/courses',
         name: 'teacher-courses',
-        builder: (context, state) => const MyCoursesScreen(),
+        builder: (context, state) => const teacher.MyCoursesScreen(),
       ),
       GoRoute(
         path: '/teacher/create-course',
@@ -138,7 +149,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'teacher-course-detail',
         builder: (context, state) {
           final courseId = state.pathParameters['id']!;
-          return CourseDetailScreen(courseId: courseId);
+          return teacher_course.CourseDetailScreen(courseId: courseId);
         },
       ),
       GoRoute(
@@ -201,7 +212,123 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TeacherProfileScreen(),
       ),
 
-      // Courses Routes (will be implemented later)
+      // Student Routes
+      GoRoute(
+        path: '/student',
+        redirect: (context, state) => '/student/home',
+      ),
+      GoRoute(
+        path: '/student/home',
+        name: 'student-home',
+        builder: (context, state) => const StudentHomeScreen(),
+      ),
+      GoRoute(
+        path: '/student/courses',
+        name: 'student-my-courses',
+        builder: (context, state) => const student.MyCoursesScreen(),
+      ),
+      GoRoute(
+        path: '/student/browse',
+        name: 'student-browse',
+        builder: (context, state) => const BrowseCoursesScreen(),
+      ),
+      GoRoute(
+        path: '/student/courses/:courseId',
+        name: 'student-course-detail',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          return student_course.CourseDetailScreen(courseId: courseId);
+        },
+      ),
+      GoRoute(
+        path: '/student/content/:contentId',
+        name: 'student-content-viewer',
+        builder: (context, state) {
+          final contentId = state.pathParameters['contentId']!;
+          final type = state.uri.queryParameters['type'] ?? 'video';
+          return ContentViewerScreen(contentId: contentId, type: type);
+        },
+      ),
+      GoRoute(
+        path: '/student/exams',
+        name: 'student-exams',
+        builder: (context, state) {
+          final courseId = state.uri.queryParameters['courseId'];
+          return ExamsListScreen(courseId: courseId);
+        },
+      ),
+      GoRoute(
+        path: '/student/exams/:examId/take',
+        name: 'student-take-exam',
+        builder: (context, state) {
+          final examId = state.pathParameters['examId']!;
+          return TakeExamScreen(examId: examId);
+        },
+      ),
+      GoRoute(
+        path: '/student/exams/:examId/results',
+        name: 'student-exam-results',
+        builder: (context, state) {
+          final examId = state.pathParameters['examId']!;
+          final score = state.uri.queryParameters['score'];
+          return ExamResultsScreen(examId: examId, score: score);
+        },
+      ),
+      GoRoute(
+        path: '/student/rag',
+        name: 'student-rag-chat',
+        builder: (context, state) {
+          final courseContentId = state.uri.queryParameters['courseContentId'];
+          return RAGChatScreen(courseContentId: courseContentId);
+        },
+      ),
+      GoRoute(
+        path: '/student/live',
+        name: 'student-live-classes',
+        builder: (context, state) => const StudentLiveClassesScreen(),
+      ),
+      GoRoute(
+        path: '/student/live/:roomName',
+        name: 'student-live-class',
+        builder: (context, state) {
+          final roomName = state.pathParameters['roomName']!;
+          return Scaffold(
+            appBar: AppBar(title: Text('Live Class: $roomName')),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.videocam, size: 100, color: Theme.of(context).colorScheme.secondary),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Join Live Class: $roomName',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Jitsi Meet integration coming soon!'),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Jitsi Meet integration coming soon!')),
+                      );
+                    },
+                    icon: const Icon(Icons.meeting_room),
+                    label: const Text('Join Meeting'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/student/profile',
+        name: 'student-profile',
+        builder: (context, state) => const StudentProfileScreen(),
+      ),
+
+      // Legacy Routes (will be implemented later)
       GoRoute(
         path: '/courses',
         name: 'courses',
