@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api import auth, courses, exams, rag, live
+from app.api import auth, courses, exams, rag, live, live_class
 
 app = FastAPI(
     title="E-Learning Platform API",
@@ -24,6 +24,7 @@ app.include_router(courses.router, prefix="/api/courses", tags=["Courses"])
 app.include_router(exams.router, prefix="/api/exams", tags=["Exams"])
 app.include_router(rag.router, prefix="/api/rag", tags=["RAG"])
 app.include_router(live.router, prefix="/api/live", tags=["Live Classes"])
+app.include_router(live_class.router, prefix="/api", tags=["Live Class Scheduling"])
 
 
 @app.get("/")

@@ -21,4 +21,5 @@ class User(Base):
     # Relationships
     courses = relationship("Course", back_populates="teacher")
     results = relationship("Result", back_populates="student")
+    live_classes = relationship("LiveClass", back_populates="teacher")
 

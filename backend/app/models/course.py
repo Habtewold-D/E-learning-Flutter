@@ -21,6 +21,7 @@ class Course(Base):
     teacher = relationship("User", back_populates="courses")
     contents = relationship("CourseContent", back_populates="course", cascade="all, delete-orphan")
     exams = relationship("Exam", back_populates="course", cascade="all, delete-orphan")
+    live_classes = relationship("LiveClass", back_populates="course", cascade="all, delete-orphan")
 
 
 class CourseContent(Base):
