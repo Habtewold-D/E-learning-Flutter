@@ -22,6 +22,20 @@ def schedule_live_class(
     if current_user.role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="Only teachers can schedule live classes")
     return create_live_class(db, teacher_id=current_user.id, data=data)
+@router.get("/{live_class_id}/join", response_model=LiveClassResponse)
+def join_live_class(
+    live_class_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    live_class = get_live_class(db, live_class_id)
+    if not live_class:
+        raise HTTPException(status_code=404, detail="Live class not found")
+    now = datetime.utcnow()
+    if live_class.status != LiveClassStatus.ACTIVE:
+        if not live_class.scheduled_time or now < live_class.scheduled_time:
+            raise HTTPException(status_code=403, detail="Class has not started yet. Please wait for the teacher.")
+    return live_class
 
 @router.get("/", response_model=List[LiveClassResponse])
 def get_live_classes(
