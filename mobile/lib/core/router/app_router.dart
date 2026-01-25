@@ -15,6 +15,7 @@ import '../../features/student/screens/take_exam_screen.dart';
 import '../../features/student/screens/exam_results_screen.dart';
 import '../../features/student/screens/rag_chat_screen.dart';
 import '../../features/student/screens/live_classes_screen.dart';
+import '../../features/student/screens/live_class_join_screen.dart';
 import '../../features/student/screens/student_profile_screen.dart';
 // Teacher screens
 import '../../features/teacher/screens/teacher_home_screen.dart';
@@ -292,34 +293,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'student-live-class',
         builder: (context, state) {
           final roomName = state.pathParameters['roomName']!;
-          return Scaffold(
-            appBar: AppBar(title: Text('Live Class: $roomName')),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.videocam, size: 100, color: Theme.of(context).colorScheme.secondary),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Join Live Class: $roomName',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Jitsi Meet integration coming soon!'),
-                  const SizedBox(height: 32),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Jitsi Meet integration coming soon!')),
-                      );
-                    },
-                    icon: const Icon(Icons.meeting_room),
-                    label: const Text('Join Meeting'),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return StudentLiveClassJoinScreen(roomName: roomName);
         },
       ),
       GoRoute(

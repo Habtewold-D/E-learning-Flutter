@@ -30,7 +30,11 @@ class Course {
       description: json['description'] as String,
       teacherId: json['teacher_id'] as int? ?? json['teacherId'] as int,
       teacherName: json['teacher_name'] as String? ?? json['teacherName'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String? ?? json['createdAt'] as String),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'] as String)
+              : DateTime.now(), // Default to now if not provided
       updatedAt: json['updated_at'] != null 
           ? DateTime.parse(json['updated_at'] as String)
           : json['updatedAt'] != null

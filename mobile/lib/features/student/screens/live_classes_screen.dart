@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../courses/models/course_model.dart';
+import '../../teacher/models/live_class.dart';
+import '../../teacher/services/course_service.dart';
+import '../services/live_class_service.dart';
 
 class StudentLiveClassesScreen extends StatefulWidget {
   const StudentLiveClassesScreen({super.key});
@@ -10,47 +16,54 @@ class StudentLiveClassesScreen extends StatefulWidget {
 }
 
 class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
-  // Mock live classes
-  final List<Map<String, dynamic>> _liveClasses = [
-    {
-      'id': 1,
-      'title': 'Live Q&A: Flutter Basics',
-      'course': 'Introduction to Flutter',
-      'teacher': 'John Teacher',
-      'date': '2024-12-25',
-      'time': '10:00 AM',
-      'status': 'upcoming', // 'upcoming', 'live', 'ended'
-      'roomName': 'flutter-basics-qa',
-    },
-    {
-      'id': 2,
-      'title': 'Workshop: React Hooks',
-      'course': 'Advanced React Development',
-      'teacher': 'Jane Instructor',
-      'date': '2024-12-24',
-      'time': '02:00 PM',
-      'status': 'live',
-      'roomName': 'react-hooks-workshop',
-    },
-    {
-      'id': 3,
-      'title': 'Python Review Session',
-      'course': 'Python Basics for Beginners',
-      'teacher': 'Bob Teacher',
-      'date': '2024-12-23',
-      'time': '11:00 AM',
-      'status': 'ended',
-      'roomName': 'python-review',
-    },
-  ];
+  late final StudentLiveClassService _liveClassService;
+  late final CourseService _courseService;
 
+  List<LiveClass> _liveClasses = [];
+  List<Course> _courses = [];
   String _filter = 'all'; // 'all', 'upcoming', 'live', 'ended'
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _liveClassService = StudentLiveClassService(ApiClient());
+    _courseService = CourseService(ApiClient());
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final liveClasses = await _liveClassService.fetchLiveClasses();
+      final courses = await _courseService.fetchCourses();
+
+      setState(() {
+        _liveClasses = liveClasses;
+        _courses = courses;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final filteredClasses = _liveClasses.where((liveClass) {
       if (_filter == 'all') return true;
-      return liveClass['status'] == _filter;
+      if (_filter == 'live') return liveClass.status == 'active';
+      if (_filter == 'upcoming') return liveClass.status == 'scheduled';
+      if (_filter == 'ended') return liveClass.status == 'ended';
+      return true;
     }).toList();
 
     return Scaffold(
@@ -59,105 +72,115 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
         elevation: 0,
       ),
       drawer: const StudentDrawer(),
-      body: Column(
-        children: [
-          // Filter Chips
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('All'),
-                    selected: _filter == 'all',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = 'all');
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('Upcoming'),
-                    selected: _filter == 'upcoming',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = 'upcoming');
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('Live'),
-                    selected: _filter == 'live',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = 'live');
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('Ended'),
-                    selected: _filter == 'ended',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = 'ended');
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Live Classes List
-          Expanded(
-            child: filteredClasses.isEmpty
-                ? Center(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.video_call_outlined, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
+                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        const SizedBox(height: 12),
                         Text(
-                          'No live classes found',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                          'Failed to load live classes',
+                          style: Theme.of(context).textTheme.titleLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _error!,
+                          style: TextStyle(color: Colors.grey[600]),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _fetchData,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
                         ),
                       ],
                     ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: () async {
-                      await Future.delayed(const Duration(seconds: 1));
-                    },
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: filteredClasses.length,
-                      itemBuilder: (context, index) {
-                        final liveClass = filteredClasses[index];
-                        return _buildLiveClassCard(liveClass);
-                      },
-                    ),
                   ),
-          ),
-        ],
-      ),
+                )
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('All'),
+                            selected: _filter == 'all',
+                            onSelected: (selected) => setState(() => _filter = 'all'),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Upcoming'),
+                            selected: _filter == 'upcoming',
+                            onSelected: (selected) => setState(() => _filter = 'upcoming'),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Live'),
+                            selected: _filter == 'live',
+                            onSelected: (selected) => setState(() => _filter = 'live'),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Ended'),
+                            selected: _filter == 'ended',
+                            onSelected: (selected) => setState(() => _filter = 'ended'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: filteredClasses.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.video_call_outlined, size: 64, color: Colors.grey[400]),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No live classes found',
+                                    style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _fetchData,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: filteredClasses.length,
+                                itemBuilder: (context, index) {
+                                  final liveClass = filteredClasses[index];
+                                  return _buildLiveClassCard(liveClass);
+                                },
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
     );
   }
 
-  Widget _buildLiveClassCard(Map<String, dynamic> liveClass) {
-    final status = liveClass['status'] as String;
+  Widget _buildLiveClassCard(LiveClass liveClass) {
+    final status = liveClass.status;
 
     Color statusColor;
     String statusText;
     IconData statusIcon;
 
     switch (status) {
-      case 'upcoming':
+      case 'scheduled':
         statusColor = Colors.blue;
         statusText = 'Upcoming';
         statusIcon = Icons.schedule;
         break;
-      case 'live':
+      case 'active':
         statusColor = Colors.red;
         statusText = 'Live Now';
         statusIcon = Icons.videocam;
@@ -173,9 +196,20 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
         statusIcon = Icons.help;
     }
 
+    final course = _courses.firstWhere(
+      (c) => c.id == liveClass.courseId,
+      orElse: () => Course(
+        id: liveClass.courseId,
+        title: 'Course #${liveClass.courseId}',
+        description: '',
+        teacherId: liveClass.teacherId,
+        createdAt: DateTime.now(),
+      ),
+    );
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: status == 'live' ? 4 : 2,
+      elevation: status == 'active' ? 4 : 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: status == 'live'
@@ -184,8 +218,8 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
       ),
       child: InkWell(
         onTap: () {
-          if (status == 'live' || status == 'upcoming') {
-            context.push('/student/live/${liveClass['roomName']}');
+          if (status == 'active' || status == 'scheduled') {
+            _handleJoin(liveClass);
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('This live class has ended')),
@@ -210,19 +244,23 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          liveClass['title'] as String,
+                          liveClass.title,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          liveClass['course'] as String,
+                          course.title,
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -249,16 +287,24 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
                 children: [
                   Icon(Icons.person, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
-                  Text(
-                    'Teacher: ${liveClass['teacher']}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  Flexible(
+                    child: Text(
+                      'Course ID: ${liveClass.courseId}',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
-                  Text(
-                    '${liveClass['date']} at ${liveClass['time']}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  Flexible(
+                    child: Text(
+                      _buildTimeText(liveClass),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
                   ),
                 ],
               ),
@@ -266,24 +312,18 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (status == 'live' || status == 'upcoming') {
-                      context.push('/student/live/${liveClass['roomName']}');
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('This live class has ended')),
-                      );
-                    }
-                  },
+                  onPressed: (status == 'active' || status == 'scheduled')
+                      ? () => _handleJoin(liveClass)
+                      : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: status == 'live' ? Colors.red : statusColor,
+                    backgroundColor: status == 'active' ? Colors.red : statusColor,
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: Colors.grey,
                   ),
                   child: Text(
-                    status == 'live'
+                    status == 'active'
                         ? 'Join Now'
-                        : status == 'upcoming'
+                        : status == 'scheduled'
                             ? 'Join When Live'
                             : 'Class Ended',
                   ),
@@ -294,6 +334,32 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
         ),
       ),
     );
+  }
+
+  String _buildTimeText(LiveClass liveClass) {
+    if (liveClass.status == 'active' && liveClass.startedAt != null) {
+      return 'Started: ${liveClass.startedAt!.toLocal()}';
+    }
+    if (liveClass.status == 'scheduled' && liveClass.scheduledTime != null) {
+      return 'Starts: ${liveClass.scheduledTime!.toLocal()}';
+    }
+    if (liveClass.endedAt != null) {
+      return 'Ended: ${liveClass.endedAt!.toLocal()}';
+    }
+    return 'Time not set';
+  }
+
+  Future<void> _handleJoin(LiveClass liveClass) async {
+    try {
+      final joined = await _liveClassService.joinLiveClass(liveClass.id);
+      if (!mounted) return;
+      context.push('/student/live/${joined.roomName}');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
   }
 }
 
