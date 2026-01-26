@@ -57,3 +57,8 @@ class ResultResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class ResultWithStudentResponse(ResultResponse):
+    student_name: str
+    student_email: str
+

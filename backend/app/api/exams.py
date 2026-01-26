@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.models.user import User, UserRole
 from app.models.course import Course
 from app.models.exam import Exam, Question, Result
-from app.schemas.exam import ExamCreate, ExamResponse, ExamSubmit, ResultResponse, QuestionResponse
+from app.schemas.exam import ExamCreate, ExamResponse, ExamSubmit, ResultResponse, QuestionResponse, ResultWithStudentResponse
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
@@ -163,4 +163,34 @@ async def get_exam_results(
         ).all()
     
     return [ResultResponse.model_validate(result) for result in results]
+
+
+@router.get("/{exam_id}/submissions", response_model=List[ResultWithStudentResponse])
+async def get_exam_submissions(
+    exam_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get exam submissions with student info (teachers only)."""
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    if current_user.role != UserRole.TEACHER or exam.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    results = db.query(Result).filter(Result.exam_id == exam_id).all()
+    return [
+        ResultWithStudentResponse(
+            id=result.id,
+            exam_id=result.exam_id,
+            student_id=result.student_id,
+            score=result.score,
+            total_questions=result.total_questions,
+            correct_answers=result.correct_answers,
+            student_name=result.student.name if result.student else "",
+            student_email=result.student.email if result.student else "",
+        )
+        for result in results
+    ]
 

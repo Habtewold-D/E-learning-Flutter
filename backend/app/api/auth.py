@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, Token, UserResponse
+from app.schemas.user import UserCreate, UserLogin, Token, UserResponse, UserUpdate
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
@@ -56,5 +56,25 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """Get current user information."""
+    return UserResponse.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_current_user(
+    updates: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update current user profile (name/email/password)."""
+    if updates.name is not None:
+        current_user.name = updates.name
+    if updates.email is not None:
+        current_user.email = updates.email
+    if updates.password is not None:
+        current_user.password = get_password_hash(updates.password)
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
     return UserResponse.model_validate(current_user)
 

@@ -26,6 +26,12 @@ class UserResponse(BaseModel):
         populate_by_name = True
 
 
+class UserUpdate(BaseModel):
+    name: str | None = None
+    email: EmailStr | None = None
+    password: str | None = None
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

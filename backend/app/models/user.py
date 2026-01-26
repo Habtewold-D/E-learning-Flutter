@@ -22,4 +22,6 @@ class User(Base):
     courses = relationship("Course", back_populates="teacher")
     results = relationship("Result", back_populates="student")
     live_classes = relationship("LiveClass", back_populates="teacher")
+    enrollments = relationship("Enrollment", back_populates="student")
+    content_progress = relationship("ContentProgress", back_populates="student")
 
