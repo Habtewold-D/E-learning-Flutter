@@ -17,6 +17,8 @@ class StudentDrawer extends ConsumerWidget {
         children: [
           // Header
           DrawerHeader(
+            margin: EdgeInsets.zero,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -27,7 +29,7 @@ class StudentDrawer extends ConsumerWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 CircleAvatar(
                   radius: 30,
@@ -46,21 +48,21 @@ class StudentDrawer extends ConsumerWidget {
                   user?.name ?? 'Student',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   user?.email ?? '',
                   style: TextStyle(
                     color: Colors.white70,
-                    fontSize: 14,
+                    fontSize: 12,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -69,7 +71,7 @@ class StudentDrawer extends ConsumerWidget {
                     'Student',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 12,
+                      fontSize: 10,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -79,15 +81,6 @@ class StudentDrawer extends ConsumerWidget {
           ),
 
           // Menu Items
-          _buildDrawerItem(
-            context,
-            icon: Icons.home,
-            title: 'Home',
-            onTap: () {
-              Navigator.pop(context);
-              context.go('/student/home');
-            },
-          ),
           _buildDrawerItem(
             context,
             icon: Icons.book,

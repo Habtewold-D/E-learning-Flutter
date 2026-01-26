@@ -6,10 +6,14 @@ from app.models.user import User, UserRole
 from app.api.dependencies import get_current_user
 from app.schemas.live_class import LiveClassCreate, LiveClassUpdate, LiveClassResponse
 from app.services.live_class_service import (
-    create_live_class, get_live_class, list_live_classes, update_live_class
+    create_live_class,
+    get_live_class,
+    list_live_classes,
+    update_live_class,
+    refresh_live_class_status,
 )
 from app.models.live_class import LiveClassStatus
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/live-classes", tags=["Live Classes"])
 
@@ -28,13 +32,18 @@ def join_live_class(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    live_class = get_live_class(db, live_class_id)
+    live_class = refresh_live_class_status(db, live_class_id)
     if not live_class:
         raise HTTPException(status_code=404, detail="Live class not found")
-    now = datetime.utcnow()
+    now = datetime.now()
     if live_class.status != LiveClassStatus.ACTIVE:
         if not live_class.scheduled_time or now < live_class.scheduled_time:
             raise HTTPException(status_code=403, detail="Class has not started yet. Please wait for the teacher.")
+        # If scheduled time passed but status not active, promote here
+        live_class.status = LiveClassStatus.ACTIVE
+        live_class.started_at = live_class.started_at or now
+        db.commit()
+        db.refresh(live_class)
     return live_class
 
 @router.get("/", response_model=List[LiveClassResponse])
@@ -52,7 +61,7 @@ def get_live_class_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    live_class = get_live_class(db, live_class_id)
+    live_class = refresh_live_class_status(db, live_class_id)
     if not live_class:
         raise HTTPException(status_code=404, detail="Live class not found")
     return live_class
@@ -64,10 +73,28 @@ def update_live_class_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    live_class = get_live_class(db, live_class_id)
+    live_class = refresh_live_class_status(db, live_class_id)
     if not live_class:
         raise HTTPException(status_code=404, detail="Live class not found")
     # Only teacher who created the class can update
     if live_class.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not allowed")
+    now = datetime.now()
+
+    # Enforce timing: allow starting up to 5 minutes before scheduled_time
+    if data.status == LiveClassStatus.ACTIVE or data.status == LiveClassStatus.ACTIVE.value:
+        if live_class.status == LiveClassStatus.ENDED:
+            raise HTTPException(status_code=400, detail="Class already ended")
+        if live_class.scheduled_time:
+            earliest_start = live_class.scheduled_time - timedelta(minutes=5)
+            if now < earliest_start:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You can start this class within 5 minutes of its scheduled time",
+                )
+        data.started_at = data.started_at or now
+
+    if data.status == LiveClassStatus.ENDED or data.status == LiveClassStatus.ENDED.value:
+        data.ended_at = data.ended_at or now
+
     return update_live_class(db, live_class_id, data)

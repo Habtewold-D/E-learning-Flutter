@@ -1,4 +1,8 @@
 from fastapi import FastAPI
+from fastapi_utils.tasks import repeat_every
+from sqlalchemy.orm import Session
+from app.core.database import SessionLocal
+from app.services.live_class_service import _auto_update_statuses
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api import auth, courses, exams, rag, live, live_class
@@ -25,6 +29,17 @@ app.include_router(exams.router, prefix="/api/exams", tags=["Exams"])
 app.include_router(rag.router, prefix="/api/rag", tags=["RAG"])
 app.include_router(live.router, prefix="/api/live", tags=["Live Classes"])
 app.include_router(live_class.router, prefix="/api", tags=["Live Class Scheduling"])
+
+
+@app.on_event("startup")
+@repeat_every(seconds=60, wait_first=True)
+def refresh_live_class_statuses() -> None:
+    """Background task to promote scheduled→active and active→ended based on time."""
+    db: Session = SessionLocal()
+    try:
+        _auto_update_statuses(db)
+    finally:
+        db.close()
 
 
 @app.get("/")

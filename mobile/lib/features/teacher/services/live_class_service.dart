@@ -11,8 +11,11 @@ class LiveClassService {
   Future<List<LiveClass>> fetchLiveClasses() async {
     try {
       final response = await _apiClient.get('/live-classes/');
-      final List<dynamic> data = response.data;
-      return data.map((json) => LiveClass.fromJson(json)).toList();
+      if (response.data is! List) {
+        throw Exception('Unexpected response from server');
+      }
+      final List<dynamic> data = response.data as List<dynamic>;
+      return data.map((json) => LiveClass.fromJson(json as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -46,8 +49,11 @@ class LiveClassService {
         'started_at': DateTime.now().toIso8601String(),
       };
 
-      final response = await _apiClient.patch('/live-classes/$liveClassId/', data: updateData);
-      return LiveClass.fromJson(response.data);
+      final response = await _apiClient.patch('/live-classes/$liveClassId', data: updateData);
+      if (response.data is! Map<String, dynamic>) {
+        throw Exception('Unexpected response from server');
+      }
+      return LiveClass.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -56,8 +62,11 @@ class LiveClassService {
   /// Get a specific live class details
   Future<LiveClass> getLiveClass(int liveClassId) async {
     try {
-      final response = await _apiClient.get('/live-classes/$liveClassId/');
-      return LiveClass.fromJson(response.data);
+      final response = await _apiClient.get('/live-classes/$liveClassId');
+      if (response.data is! Map<String, dynamic>) {
+        throw Exception('Unexpected response from server');
+      }
+      return LiveClass.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -67,7 +76,10 @@ class LiveClassService {
   Future<LiveClass> joinLiveClass(int liveClassId) async {
     try {
       final response = await _apiClient.get('/live-classes/$liveClassId/join');
-      return LiveClass.fromJson(response.data);
+      if (response.data is! Map<String, dynamic>) {
+        throw Exception('Unexpected response from server');
+      }
+      return LiveClass.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -77,18 +89,26 @@ class LiveClassService {
     if (e.response != null) {
       final statusCode = e.response!.statusCode;
       final data = e.response!.data;
+      String detail;
+      if (data is Map<String, dynamic> && data['detail'] != null) {
+        detail = data['detail'].toString();
+      } else if (data is String) {
+        detail = data;
+      } else {
+        detail = 'Unknown error';
+      }
 
       switch (statusCode) {
         case 401:
           return Exception('Authentication required. Please log in again.');
         case 403:
-          return Exception(data['detail'] ?? 'Access denied.');
+          return Exception(detail.isNotEmpty ? detail : 'Access denied.');
         case 404:
           return Exception('Live class not found.');
         case 400:
-          return Exception(data['detail'] ?? 'Invalid request.');
+          return Exception(detail.isNotEmpty ? detail : 'Invalid request.');
         default:
-          return Exception('Server error: ${data['detail'] ?? 'Unknown error'}');
+          return Exception('Server error: $detail');
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       return Exception('Connection timeout. Please check your internet connection.');

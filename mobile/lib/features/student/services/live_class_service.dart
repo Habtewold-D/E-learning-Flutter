@@ -10,7 +10,7 @@ class StudentLiveClassService {
   Future<List<LiveClass>> fetchLiveClasses({String? status}) async {
     try {
       final response = await _apiClient.get(
-        '/live-classes/',
+        '/live-classes',
         queryParameters: status != null ? {'status': status} : null,
       );
       final List<dynamic> data = response.data;

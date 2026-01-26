@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'dart:async';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/widgets/student_drawer.dart';
@@ -31,6 +33,11 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
     _liveClassService = StudentLiveClassService(ApiClient());
     _courseService = CourseService(ApiClient());
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   Future<void> _fetchData() async {
@@ -308,6 +315,13 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 6),
+              Text(
+                _endTimeText(liveClass),
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -347,6 +361,14 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
       return 'Ended: ${liveClass.endedAt!.toLocal()}';
     }
     return 'Time not set';
+  }
+
+  String _endTimeText(LiveClass liveClass) {
+    final base = liveClass.startedAt ?? liveClass.scheduledTime;
+    if (base == null) return 'Ends ~1h after start';
+    final end = base.add(const Duration(hours: 1));
+    final formatter = DateFormat('yyyy-MM-dd HH:mm');
+    return 'Will end by ${formatter.format(end)} (max 1h)';
   }
 
   Future<void> _handleJoin(LiveClass liveClass) async {
