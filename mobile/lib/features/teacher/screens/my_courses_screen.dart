@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
+import '../../../core/api/api_client.dart';
+import '../../courses/models/course_model.dart';
+import '../services/course_service.dart';
 
 class MyCoursesScreen extends StatefulWidget {
   const MyCoursesScreen({super.key});
@@ -11,63 +14,56 @@ class MyCoursesScreen extends StatefulWidget {
 }
 
 class _MyCoursesScreenState extends State<MyCoursesScreen> {
-  // Mock courses data
-  final List<Map<String, dynamic>> _courses = [
-    {
-      'id': 1,
-      'title': 'Introduction to Flutter',
-      'description': 'Learn Flutter from scratch with hands-on projects',
-      'students': 15,
-      'contentCount': 8,
-      'examCount': 2,
-      'createdAt': '2024-01-15',
-    },
-    {
-      'id': 2,
-      'title': 'Advanced React Development',
-      'description': 'Master React hooks, context, and advanced patterns',
-      'students': 12,
-      'contentCount': 12,
-      'examCount': 3,
-      'createdAt': '2024-01-20',
-    },
-    {
-      'id': 3,
-      'title': 'Python Basics for Beginners',
-      'description': 'Start your programming journey with Python',
-      'students': 8,
-      'contentCount': 10,
-      'examCount': 2,
-      'createdAt': '2024-02-01',
-    },
-    {
-      'id': 4,
-      'title': 'Database Design & SQL',
-      'description': 'Learn to design and query databases effectively',
-      'students': 5,
-      'contentCount': 6,
-      'examCount': 1,
-      'createdAt': '2024-02-10',
-    },
-    {
-      'id': 5,
-      'title': 'Mobile App UI/UX Design',
-      'description': 'Create beautiful and intuitive mobile interfaces',
-      'students': 2,
-      'contentCount': 4,
-      'examCount': 1,
-      'createdAt': '2024-02-15',
-    },
-  ];
+  late final CourseService _courseService;
+  List<Course> _courses = [];
+  bool _isLoading = true;
+  String? _error;
 
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = CourseService(ApiClient());
+    _fetchCourses();
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    // Reset state on hot reload to avoid stale mock data types
+    _courses = [];
+    _fetchCourses();
+  }
+
+  Future<void> _fetchCourses() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final courses = await _courseService.fetchMyCourses();
+      setState(() {
+        _courses = courses;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final filteredCourses = _courses.where((course) {
       if (_searchQuery.isEmpty) return true;
-      return course['title'].toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          course['description'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
+      final title = course.title.toLowerCase();
+      final description = (course.description ?? '').toLowerCase();
+      return title.contains(_searchQuery.toLowerCase()) ||
+          description.contains(_searchQuery.toLowerCase());
     }).toList();
 
     return Scaffold(
@@ -91,13 +87,15 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Search courses...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: Colors.grey[600]),
+                prefixIcon: Icon(Icons.search, color: Colors.grey[700]),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: Colors.grey[200],
               ),
+              style: const TextStyle(color: Colors.black87),
               onChanged: (value) {
                 setState(() {
                   _searchQuery = value;
@@ -108,50 +106,75 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
           // Courses List
           Expanded(
-            child: filteredCourses.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.book_outlined,
-                          size: 64,
-                          color: Colors.grey[400],
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Failed to load courses',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _error!,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _fetchCourses,
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.isEmpty
-                              ? 'No courses yet'
-                              : 'No courses found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
+                      )
+                    : filteredCourses.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.book_outlined,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _searchQuery.isEmpty
+                                      ? 'No courses yet'
+                                      : 'No courses found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                if (_searchQuery.isEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => context.push('/teacher/create-course'),
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Create Your First Course'),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _fetchCourses,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: filteredCourses.length,
+                              itemBuilder: (context, index) {
+                                final course = filteredCourses[index];
+                                return _buildCourseCard(course);
+                              },
+                            ),
                           ),
-                        ),
-                        if (_searchQuery.isEmpty) ...[
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: () => context.push('/teacher/create-course'),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Create Your First Course'),
-                          ),
-                        ],
-                      ],
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: () async {
-                      await Future.delayed(const Duration(seconds: 1));
-                    },
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: filteredCourses.length,
-                      itemBuilder: (context, index) {
-                        final course = filteredCourses[index];
-                        return _buildCourseCard(course);
-                      },
-                    ),
-                  ),
           ),
         ],
       ),
@@ -164,13 +187,16 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     );
   }
 
-  Widget _buildCourseCard(Map<String, dynamic> course) {
+  Widget _buildCourseCard(Course course) {
+    final createdAtText = course.createdAt != null
+        ? course.createdAt!.toLocal().toString().split(' ').first
+        : '—';
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () => context.push('/teacher/courses/${course['id']}'),
+        onTap: () => context.push('/teacher/courses/${course.id}'),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -181,7 +207,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      course['title'] as String,
+                      course.title,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -228,7 +254,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                course['description'] as String,
+                course.description ?? '',
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontSize: 14,
@@ -241,28 +267,21 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                 children: [
                   _buildInfoChip(
                     icon: Icons.people,
-                    label: '${course['students']} students',
+                    label: '0 students',
                   ),
                   const SizedBox(width: 12),
                   _buildInfoChip(
                     icon: Icons.description,
-                    label: '${course['contentCount']} content',
+                    label: '0 content',
                   ),
                   const SizedBox(width: 12),
                   _buildInfoChip(
                     icon: Icons.quiz,
-                    label: '${course['examCount']} exams',
+                    label: '0 exams',
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                'Created: ${course['createdAt']}',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 12,
-                ),
-              ),
             ],
           ),
         ),
@@ -287,12 +306,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     );
   }
 
-  void _showDeleteDialog(Map<String, dynamic> course) {
+  void _showDeleteDialog(Course course) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Course'),
-        content: Text('Are you sure you want to delete "${course['title']}"? This action cannot be undone.'),
+        content: Text('Are you sure you want to delete "${course.title}"? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -302,7 +321,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${course['title']} deleted (mock)')),
+                SnackBar(content: Text('${course.title} deleted (mock)')),
               );
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),

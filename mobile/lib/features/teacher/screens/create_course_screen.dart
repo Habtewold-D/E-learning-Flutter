@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/api_client.dart';
+import '../services/course_service.dart';
 
 class CreateCourseScreen extends StatefulWidget {
   const CreateCourseScreen({super.key});
@@ -13,12 +15,19 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   bool _isLoading = false;
+  late final CourseService _courseService;
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = CourseService(ApiClient());
   }
 
   Future<void> _handleCreate() async {
@@ -30,22 +39,39 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
       _isLoading = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Course created successfully!'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      await _courseService.createCourse(
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
       );
 
-      context.pop();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Course created successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

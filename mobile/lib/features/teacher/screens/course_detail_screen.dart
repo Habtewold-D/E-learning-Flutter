@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
+import '../../../core/api/api_client.dart';
+import '../../courses/models/course_model.dart';
+import '../../courses/models/course_content_model.dart';
+import '../../exams/models/exam_model.dart';
+import '../services/course_service.dart';
 
-class CourseDetailScreen extends StatelessWidget {
+class CourseDetailScreen extends StatefulWidget {
   final String courseId;
 
   const CourseDetailScreen({
@@ -12,35 +17,67 @@ class CourseDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<CourseDetailScreen> createState() => _CourseDetailScreenState();
+}
+
+class _CourseDetailScreenState extends State<CourseDetailScreen> {
+  late final CourseService _courseService;
+  Course? _course;
+  List<CourseContent> _contents = [];
+  List<ExamSummary> _exams = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = CourseService(ApiClient());
+    _loadCourseData();
+  }
+
+  Future<void> _loadCourseData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final courseId = int.tryParse(widget.courseId);
+    if (courseId == null) {
+      setState(() {
+        _error = 'Invalid course id';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final results = await Future.wait([
+        _courseService.fetchCourseDetail(courseId),
+        _courseService.fetchCourseContent(courseId),
+        _courseService.fetchExamsByCourse(courseId),
+      ]);
+
+      setState(() {
+        _course = results[0] as Course;
+        _contents = results[1] as List<CourseContent>;
+        _exams = results[2] as List<ExamSummary>;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Mock course data
-    final course = {
-      'id': int.parse(courseId),
-      'title': 'Introduction to Flutter',
-      'description': 'Learn Flutter from scratch with hands-on projects. This course covers everything from basic widgets to state management and API integration.',
-      'students': 15,
-      'createdAt': '2024-01-15',
-    };
-
-    // Mock content
-    final contents = [
-      {'id': 1, 'title': 'Chapter 1: Getting Started', 'type': 'pdf', 'url': 'chapter1.pdf'},
-      {'id': 2, 'title': 'Chapter 2: Widgets Basics', 'type': 'pdf', 'url': 'chapter2.pdf'},
-      {'id': 3, 'title': 'Flutter Setup Tutorial', 'type': 'video', 'url': 'setup.mp4'},
-      {'id': 4, 'title': 'Chapter 3: State Management', 'type': 'pdf', 'url': 'chapter3.pdf'},
-    ];
-
-    // Mock exams
-    final exams = [
-      {'id': 1, 'title': 'Midterm Exam', 'questions': 20, 'duration': 60},
-      {'id': 2, 'title': 'Final Exam', 'questions': 30, 'duration': 90},
-    ];
-
     return DefaultTabController(
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(course['title'] as String),
+          title: Text(_course?.title ?? 'Course'),
           elevation: 0,
           actions: [
             IconButton(
@@ -66,7 +103,7 @@ class CourseDetailScreen extends StatelessWidget {
               ],
               onSelected: (value) {
                 if (value == 'delete') {
-                  _showDeleteDialog(context, course['title'] as String);
+                  _showDeleteDialog(context, _course?.title ?? 'Course');
                 }
               },
             ),
@@ -80,16 +117,43 @@ class CourseDetailScreen extends StatelessWidget {
           ),
         ),
         drawer: const TeacherDrawer(),
-        body: TabBarView(
-          children: [
-            _buildOverviewTab(context, course, contents, exams),
-            _buildContentTab(context, contents, courseId),
-            _buildExamsTab(context, exams, courseId),
-          ],
-        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Failed to load course',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _error!,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadCourseData,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : TabBarView(
+                    children: [
+                      _buildOverviewTab(context),
+                      _buildContentTab(context),
+                      _buildExamsTab(context),
+                    ],
+                  ),
         bottomNavigationBar: const TeacherBottomNav(currentIndex: 1),
         floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => context.push('/teacher/courses/$courseId/upload-content'),
+          onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
           icon: const Icon(Icons.upload_file),
           label: const Text('Upload Content'),
         ),
@@ -99,9 +163,6 @@ class CourseDetailScreen extends StatelessWidget {
 
   Widget _buildOverviewTab(
     BuildContext context,
-    Map<String, dynamic> course,
-    List<Map<String, dynamic>> contents,
-    List<Map<String, dynamic>> exams,
   ) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -124,12 +185,12 @@ class CourseDetailScreen extends StatelessWidget {
                         ),
                   ),
                   const SizedBox(height: 16),
-                  _buildInfoRow('Description', course['description'] as String),
+                  _buildInfoRow('Description', _course?.description ?? ''),
                   const Divider(),
-                  _buildInfoRow('Students Enrolled', '${course['students']}'),
-                  _buildInfoRow('Content Items', '${contents.length}'),
-                  _buildInfoRow('Exams', '${exams.length}'),
-                  _buildInfoRow('Created', course['createdAt'] as String),
+                  _buildInfoRow('Students Enrolled', '—'),
+                  _buildInfoRow('Content Items', '${_contents.length}'),
+                  _buildInfoRow('Exams', '${_exams.length}'),
+                  _buildInfoRow('Created', _course?.createdAt?.toLocal().toString().split(' ').first ?? '—'),
                 ],
               ),
             ),
@@ -151,7 +212,7 @@ class CourseDetailScreen extends StatelessWidget {
                   context,
                   icon: Icons.people,
                   title: 'Students',
-                  value: '${course['students']}',
+                  value: '—',
                   color: Colors.blue,
                 ),
               ),
@@ -161,7 +222,7 @@ class CourseDetailScreen extends StatelessWidget {
                   context,
                   icon: Icons.description,
                   title: 'Content',
-                  value: '${contents.length}',
+                  value: '${_contents.length}',
                   color: Colors.green,
                 ),
               ),
@@ -171,7 +232,7 @@ class CourseDetailScreen extends StatelessWidget {
                   context,
                   icon: Icons.quiz,
                   title: 'Exams',
-                  value: '${exams.length}',
+                  value: '${_exams.length}',
                   color: Colors.orange,
                 ),
               ),
@@ -184,8 +245,6 @@ class CourseDetailScreen extends StatelessWidget {
 
   Widget _buildContentTab(
     BuildContext context,
-    List<Map<String, dynamic>> contents,
-    String courseId,
   ) {
     return Column(
       children: [
@@ -195,13 +254,13 @@ class CourseDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Course Content (${contents.length})',
+                'Course Content (${_contents.length})',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
               ),
               ElevatedButton.icon(
-                onPressed: () => context.push('/teacher/courses/$courseId/upload-content'),
+                onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
                 icon: const Icon(Icons.add),
                 label: const Text('Add Content'),
               ),
@@ -209,7 +268,7 @@ class CourseDetailScreen extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: contents.isEmpty
+          child: _contents.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -222,7 +281,7 @@ class CourseDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
-                        onPressed: () => context.push('/teacher/courses/$courseId/upload-content'),
+                        onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
                         icon: const Icon(Icons.upload_file),
                         label: const Text('Upload First Content'),
                       ),
@@ -231,9 +290,9 @@ class CourseDetailScreen extends StatelessWidget {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: contents.length,
+                  itemCount: _contents.length,
                   itemBuilder: (context, index) {
-                    final content = contents[index];
+                    final content = _contents[index];
                     return _buildContentCard(context, content);
                   },
                 ),
@@ -244,8 +303,6 @@ class CourseDetailScreen extends StatelessWidget {
 
   Widget _buildExamsTab(
     BuildContext context,
-    List<Map<String, dynamic>> exams,
-    String courseId,
   ) {
     return Column(
       children: [
@@ -255,13 +312,13 @@ class CourseDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Exams (${exams.length})',
+                'Exams (${_exams.length})',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
               ),
               ElevatedButton.icon(
-                onPressed: () => context.push('/teacher/courses/$courseId/create-exam'),
+                onPressed: () => context.push('/teacher/courses/${widget.courseId}/create-exam'),
                 icon: const Icon(Icons.add),
                 label: const Text('Create Exam'),
               ),
@@ -269,7 +326,7 @@ class CourseDetailScreen extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: exams.isEmpty
+          child: _exams.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -282,7 +339,7 @@ class CourseDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
-                        onPressed: () => context.push('/teacher/courses/$courseId/create-exam'),
+                        onPressed: () => context.push('/teacher/courses/${widget.courseId}/create-exam'),
                         icon: const Icon(Icons.add),
                         label: const Text('Create First Exam'),
                       ),
@@ -291,10 +348,10 @@ class CourseDetailScreen extends StatelessWidget {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: exams.length,
+                  itemCount: _exams.length,
                   itemBuilder: (context, index) {
-                    final exam = exams[index];
-                    return _buildExamCard(context, exam, courseId);
+                    final exam = _exams[index];
+                    return _buildExamCard(context, exam, widget.courseId);
                   },
                 ),
         ),
@@ -359,8 +416,8 @@ class CourseDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildContentCard(BuildContext context, Map<String, dynamic> content) {
-    final isPdf = content['type'] == 'pdf';
+  Widget _buildContentCard(BuildContext context, CourseContent content) {
+    final isPdf = content.type == 'pdf';
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 1,
@@ -375,7 +432,7 @@ class CourseDetailScreen extends StatelessWidget {
           ),
         ),
         title: Text(
-          content['title'] as String,
+          content.title,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
@@ -398,7 +455,7 @@ class CourseDetailScreen extends StatelessWidget {
           onSelected: (value) {
             if (value == 'delete') {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${content['title']} deleted (mock)')),
+                SnackBar(content: Text('${content.title} deleted (mock)')),
               );
             }
           },
@@ -407,7 +464,7 @@ class CourseDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildExamCard(BuildContext context, Map<String, dynamic> exam, String courseId) {
+  Widget _buildExamCard(BuildContext context, ExamSummary exam, String courseId) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 1,
@@ -419,14 +476,14 @@ class CourseDetailScreen extends StatelessWidget {
           child: const Icon(Icons.quiz, color: Colors.orange),
         ),
         title: Text(
-          exam['title'] as String,
+          exam.title,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text('${exam['questions']} questions • ${exam['duration']} minutes'),
+            Text('${exam.questionsCount} questions'),
           ],
         ),
         trailing: Row(
@@ -435,7 +492,7 @@ class CourseDetailScreen extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.visibility),
               onPressed: () {
-                context.push('/teacher/exams/${exam['id']}');
+                context.push('/teacher/exams/${exam.id}');
               },
             ),
             PopupMenuButton(
@@ -463,10 +520,10 @@ class CourseDetailScreen extends StatelessWidget {
               ],
               onSelected: (value) {
                 if (value == 'edit') {
-                  context.push('/teacher/courses/$courseId/create-exam?examId=${exam['id']}');
+                  context.push('/teacher/courses/$courseId/create-exam?examId=${exam.id}');
                 } else if (value == 'delete') {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${exam['title']} deleted (mock)')),
+                    SnackBar(content: Text('${exam.title} deleted (mock)')),
                   );
                 }
               },

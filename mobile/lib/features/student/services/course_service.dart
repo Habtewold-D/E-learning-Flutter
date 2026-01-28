@@ -2,55 +2,14 @@ import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../courses/models/course_model.dart';
 import '../../courses/models/course_content_model.dart';
+import '../../courses/models/course_progress_model.dart';
 import '../../exams/models/exam_model.dart';
 
-class CourseService {
+class StudentCourseService {
   final ApiClient _apiClient;
 
-  CourseService(this._apiClient);
+  StudentCourseService(this._apiClient);
 
-  /// Fetch courses created by current teacher
-  Future<List<Course>> fetchMyCourses() async {
-    try {
-      final response = await _apiClient.get('/courses/teacher/me');
-      final List<dynamic> data = response.data;
-      return data.map((json) => Course.fromJson(json)).toList();
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
-  }
-
-  /// Fetch all courses (used by live classes to map course titles)
-  Future<List<Course>> fetchCourses() async {
-    try {
-      final response = await _apiClient.get('/courses/');
-      final List<dynamic> data = response.data;
-      return data.map((json) => Course.fromJson(json)).toList();
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
-  }
-
-  /// Create a new course
-  Future<Course> createCourse({
-    required String title,
-    required String description,
-  }) async {
-    try {
-      final response = await _apiClient.post(
-        '/courses/',
-        data: {
-          'title': title,
-          'description': description,
-        },
-      );
-      return Course.fromJson(response.data as Map<String, dynamic>);
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
-  }
-
-  /// Fetch course detail with contents
   Future<Course> fetchCourseDetail(int courseId) async {
     try {
       final response = await _apiClient.get('/courses/$courseId');
@@ -60,7 +19,6 @@ class CourseService {
     }
   }
 
-  /// Fetch content list for a course
   Future<List<CourseContent>> fetchCourseContent(int courseId) async {
     try {
       final response = await _apiClient.get('/courses/$courseId');
@@ -74,7 +32,15 @@ class CourseService {
     }
   }
 
-  /// Fetch exams by course
+  Future<CourseProgress> fetchCourseProgress(int courseId) async {
+    try {
+      final response = await _apiClient.get('/courses/$courseId/progress');
+      return CourseProgress.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<List<ExamSummary>> fetchExamsByCourse(int courseId) async {
     try {
       final response = await _apiClient.get('/exams/course/$courseId');
@@ -87,20 +53,38 @@ class CourseService {
     }
   }
 
+  Future<void> markContentComplete(int courseId, int contentId) async {
+    try {
+      await _apiClient.post('/courses/$courseId/content/$contentId/complete');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Exception _handleError(DioException e) {
     if (e.response != null) {
       final statusCode = e.response!.statusCode;
       final data = e.response!.data;
+      String detail;
+      if (data is Map<String, dynamic> && data['detail'] != null) {
+        detail = data['detail'].toString();
+      } else if (data is String) {
+        detail = data;
+      } else {
+        detail = 'Unknown error';
+      }
 
       switch (statusCode) {
         case 401:
           return Exception('Authentication required. Please log in again.');
         case 403:
-          return Exception('Access denied.');
+          return Exception(detail.isNotEmpty ? detail : 'Access denied.');
         case 404:
-          return Exception('Courses not found.');
+          return Exception(detail.isNotEmpty ? detail : 'Not found.');
+        case 400:
+          return Exception(detail.isNotEmpty ? detail : 'Invalid request.');
         default:
-          return Exception('Server error: ${data['detail'] ?? 'Unknown error'}');
+          return Exception('Server error: $detail');
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       return Exception('Connection timeout. Please check your internet connection.');
