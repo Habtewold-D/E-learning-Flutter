@@ -205,21 +205,29 @@ class _ExamsManagementScreenState extends State<ExamsManagementScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.visibility),
-            onPressed: () {
-              context.push('/teacher/exams/${exam.id}');
+            onPressed: () async {
+              final result = await context.push('/teacher/exams/${exam.id}');
+              if (result == true) {
+                await _fetchExamManagementData();
+              }
             },
             tooltip: 'View Details',
           ),
           IconButton(
             icon: const Icon(Icons.people),
-            onPressed: () {
-              context.push('/teacher/exams/${exam.id}/submissions');
+            onPressed: () async {
+              await context.push('/teacher/exams/${exam.id}/submissions');
             },
             tooltip: 'View Submissions',
           ),
         ],
       ),
-      onTap: () => context.push('/teacher/exams/${exam.id}'),
+      onTap: () async {
+        final result = await context.push('/teacher/exams/${exam.id}');
+        if (result == true) {
+          await _fetchExamManagementData();
+        }
+      },
     );
   }
 }

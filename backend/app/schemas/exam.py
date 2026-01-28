@@ -19,6 +19,7 @@ class QuestionResponse(BaseModel):
     option_b: str
     option_c: str
     option_d: str
+    correct_option: str
 
     class Config:
         from_attributes = True
@@ -29,6 +30,20 @@ class ExamCreate(BaseModel):
     title: str
     description: Optional[str] = None
     questions: List[QuestionCreate]
+
+
+class ExamUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
+class QuestionUpdate(BaseModel):
+    question: Optional[str] = None
+    option_a: Optional[str] = None
+    option_b: Optional[str] = None
+    option_c: Optional[str] = None
+    option_d: Optional[str] = None
+    correct_option: Optional[str] = None
 
 
 class ExamResponse(BaseModel):

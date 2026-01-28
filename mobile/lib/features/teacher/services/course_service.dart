@@ -120,6 +120,63 @@ class CourseService {
     }
   }
 
+  /// Update exam title/description
+  Future<ExamDetail> updateExam({
+    required int examId,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final response = await _apiClient.patch(
+        '/exams/$examId',
+        data: data,
+      );
+      return ExamDetail.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Add a question to an exam
+  Future<ExamQuestion> addExamQuestion({
+    required int examId,
+    required Map<String, dynamic> question,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        '/exams/$examId/questions',
+        data: question,
+      );
+      return ExamQuestion.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Update an existing question
+  Future<ExamQuestion> updateExamQuestion({
+    required int questionId,
+    required Map<String, dynamic> question,
+  }) async {
+    try {
+      final response = await _apiClient.patch(
+        '/exams/questions/$questionId',
+        data: question,
+      );
+      return ExamQuestion.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Delete a question
+  Future<void> deleteExamQuestion(int questionId) async {
+    try {
+      await _apiClient.delete('/exams/questions/$questionId');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// Fetch submissions for an exam (teacher)
   Future<List<ExamSubmission>> fetchExamSubmissions(int examId) async {
     try {

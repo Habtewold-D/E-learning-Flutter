@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.models.user import User, UserRole
 from app.models.course import Course
 from app.models.exam import Exam, Question, Result
-from app.schemas.exam import ExamCreate, ExamResponse, ExamSubmit, ResultResponse, QuestionResponse, ResultWithStudentResponse
+from app.schemas.exam import ExamCreate, ExamResponse, ExamSubmit, ResultResponse, QuestionResponse, ResultWithStudentResponse, QuestionCreate, QuestionUpdate, ExamUpdate
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
@@ -92,6 +92,129 @@ async def get_exam(exam_id: int, db: Session = Depends(get_db)):
         description=exam.description,
         questions=[QuestionResponse.model_validate(q) for q in exam.questions]
     )
+
+
+@router.patch("/{exam_id}", response_model=ExamResponse)
+async def update_exam(
+    exam_id: int,
+    exam_data: ExamUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update exam title/description (teachers only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can update exams")
+
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    if exam.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own exams")
+
+    update_data = exam_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(exam, key, value)
+
+    db.commit()
+    db.refresh(exam)
+
+    return ExamResponse(
+        id=exam.id,
+        course_id=exam.course_id,
+        title=exam.title,
+        description=exam.description,
+        questions=[QuestionResponse.model_validate(q) for q in exam.questions]
+    )
+
+
+@router.post("/{exam_id}/questions", response_model=QuestionResponse)
+async def add_question(
+    exam_id: int,
+    question_data: QuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Add a question to an exam (teachers only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can add questions")
+
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    if exam.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own exams")
+
+    question = Question(
+        exam_id=exam_id,
+        question=question_data.question,
+        option_a=question_data.option_a,
+        option_b=question_data.option_b,
+        option_c=question_data.option_c,
+        option_d=question_data.option_d,
+        correct_option=question_data.correct_option.lower()
+    )
+    db.add(question)
+    db.commit()
+    db.refresh(question)
+
+    return QuestionResponse.model_validate(question)
+
+
+@router.patch("/questions/{question_id}", response_model=QuestionResponse)
+async def update_question(
+    question_id: int,
+    question_data: QuestionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a question (teachers only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can update questions")
+
+    question = db.query(Question).filter(Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    exam = db.query(Exam).filter(Exam.id == question.exam_id).first()
+    if not exam or exam.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own exams")
+
+    update_data = question_data.model_dump(exclude_unset=True)
+    if "correct_option" in update_data and update_data["correct_option"]:
+        update_data["correct_option"] = update_data["correct_option"].lower()
+
+    for key, value in update_data.items():
+        setattr(question, key, value)
+
+    db.commit()
+    db.refresh(question)
+
+    return QuestionResponse.model_validate(question)
+
+
+@router.delete("/questions/{question_id}")
+async def delete_question(
+    question_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a question (teachers only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can delete questions")
+
+    question = db.query(Question).filter(Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    exam = db.query(Exam).filter(Exam.id == question.exam_id).first()
+    if not exam or exam.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own exams")
+
+    db.delete(question)
+    db.commit()
+
+    return {"detail": "Question deleted"}
 
 
 @router.post("/{exam_id}/submit", response_model=ResultResponse)

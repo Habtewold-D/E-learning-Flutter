@@ -63,6 +63,9 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       appBar: AppBar(
         title: Text(exam?.title ?? 'Exam Details'),
         elevation: 0,
+        leading: BackButton(
+          onPressed: () => Navigator.pop(context, true),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -259,63 +262,72 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _exam = ExamDetail(
-                  id: exam.id,
-                  courseId: exam.courseId,
-                  title: titleController.text.trim().isEmpty
-                      ? exam.title
-                      : titleController.text.trim(),
-                  description: descriptionController.text.trim().isEmpty
-                      ? null
-                      : descriptionController.text.trim(),
-                  questions: exam.questions,
+            onPressed: () async {
+              final title = titleController.text.trim();
+              final description = descriptionController.text.trim();
+              try {
+                await _courseService.updateExam(
+                  examId: exam.id,
+                  data: {
+                    'title': title.isEmpty ? exam.title : title,
+                    'description': description.isEmpty ? null : description,
+                  },
                 );
-              });
-              Navigator.pop(context);
+                await _fetchExamDetail();
+                if (mounted) {
+                  Navigator.pop(context);
+                }
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString()),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             child: const Text('Save'),
           ),
         ],
       ),
-    ).whenComplete(() {
-      titleController.dispose();
-      descriptionController.dispose();
-    });
+    );
   }
 
   void _showAddQuestionDialog() {
     showDialog(
       context: context,
       builder: (context) => _ExamQuestionDialog(
-        onSave: (question) {
+        onSave: (question) async {
           final exam = _exam;
           if (exam == null) return;
 
-          final nextId = exam.questions.isEmpty
-              ? 1
-              : exam.questions.map((q) => q.id).fold(0, (a, b) => a > b ? a : b) + 1;
+          final optionC = question.type == 'true_false' ? question.optionA : question.optionC;
+          final optionD = question.type == 'true_false' ? question.optionB : question.optionD;
 
-          final newQuestion = ExamQuestion(
-            id: nextId,
-            question: question.question,
-            optionA: question.optionA,
-            optionB: question.optionB,
-            optionC: question.type == 'true_false' ? '' : question.optionC,
-            optionD: question.type == 'true_false' ? '' : question.optionD,
-            correctOption: question.correctOption,
-          );
-
-          setState(() {
-            _exam = ExamDetail(
-              id: exam.id,
-              courseId: exam.courseId,
-              title: exam.title,
-              description: exam.description,
-              questions: [...exam.questions, newQuestion],
+          try {
+            await _courseService.addExamQuestion(
+              examId: exam.id,
+              question: {
+                'question': question.question,
+                'option_a': question.optionA,
+                'option_b': question.optionB,
+                'option_c': optionC,
+                'option_d': optionD,
+                'correct_option': question.correctOption,
+              },
             );
-          });
+
+            await _fetchExamDetail();
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString()),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         },
       ),
     );
@@ -353,6 +365,14 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       fontSize: 16,
                     ),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => _showEditQuestionDialog(question),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                  onPressed: () => _confirmDeleteQuestion(question),
                 ),
               ],
             ),
@@ -413,6 +433,87 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       ),
     );
   }
+
+  void _showEditQuestionDialog(ExamQuestion question) {
+    final isTrueFalse =
+        question.optionC.isEmpty && question.optionD.isEmpty;
+    showDialog(
+      context: context,
+      builder: (context) => _ExamQuestionDialog(
+        initial: _ExamQuestionDraft(
+          question: question.question,
+          type: isTrueFalse ? 'true_false' : 'multiple_choice',
+          optionA: question.optionA,
+          optionB: question.optionB,
+          optionC: question.optionC,
+          optionD: question.optionD,
+          correctOption: question.correctOption,
+        ),
+        onSave: (draft) async {
+          try {
+            final optionC = draft.type == 'true_false' ? draft.optionA : draft.optionC;
+            final optionD = draft.type == 'true_false' ? draft.optionB : draft.optionD;
+
+            await _courseService.updateExamQuestion(
+              questionId: question.id,
+              question: {
+                'question': draft.question,
+                'option_a': draft.optionA,
+                'option_b': draft.optionB,
+                'option_c': optionC,
+                'option_d': optionD,
+                'correct_option': draft.correctOption,
+              },
+            );
+
+            await _fetchExamDetail();
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString()),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  void _confirmDeleteQuestion(ExamQuestion question) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Question'),
+        content: const Text('Are you sure you want to delete this question?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _courseService.deleteExamQuestion(question.id);
+                await _fetchExamDetail();
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString()),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ExamQuestionDraft {
@@ -437,8 +538,9 @@ class _ExamQuestionDraft {
 
 class _ExamQuestionDialog extends StatefulWidget {
   final void Function(_ExamQuestionDraft) onSave;
+  final _ExamQuestionDraft? initial;
 
-  const _ExamQuestionDialog({required this.onSave});
+  const _ExamQuestionDialog({required this.onSave, this.initial});
 
   @override
   State<_ExamQuestionDialog> createState() => _ExamQuestionDialogState();
@@ -462,6 +564,21 @@ class _ExamQuestionDialogState extends State<_ExamQuestionDialog> {
     _optionCController.dispose();
     _optionDController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _questionController.text = initial.question;
+      _questionType = initial.type;
+      _optionAController.text = initial.optionA;
+      _optionBController.text = initial.optionB;
+      _optionCController.text = initial.optionC;
+      _optionDController.text = initial.optionD;
+      _correctOption = initial.correctOption.toLowerCase();
+    }
   }
 
   void _handleSave() {
