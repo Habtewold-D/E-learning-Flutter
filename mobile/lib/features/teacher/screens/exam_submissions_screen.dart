@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/teacher_drawer.dart';
+import '../../exams/models/exam_model.dart';
+import '../services/course_service.dart';
 
-class ExamSubmissionsScreen extends StatelessWidget {
+class ExamSubmissionsScreen extends StatefulWidget {
   final String examId;
 
   const ExamSubmissionsScreen({
@@ -11,53 +14,51 @@ class ExamSubmissionsScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    // Mock submissions data
-    final submissions = [
-      {
-        'id': 1,
-        'studentName': 'John Doe',
-        'studentEmail': 'john@example.com',
-        'score': 85,
-        'totalQuestions': 20,
-        'submittedAt': '2024-12-23 10:30',
-        'status': 'completed',
-      },
-      {
-        'id': 2,
-        'studentName': 'Jane Smith',
-        'studentEmail': 'jane@example.com',
-        'score': 92,
-        'totalQuestions': 20,
-        'submittedAt': '2024-12-23 11:15',
-        'status': 'completed',
-      },
-      {
-        'id': 3,
-        'studentName': 'Bob Johnson',
-        'studentEmail': 'bob@example.com',
-        'score': 78,
-        'totalQuestions': 20,
-        'submittedAt': '2024-12-23 12:00',
-        'status': 'completed',
-      },
-      {
-        'id': 4,
-        'studentName': 'Alice Williams',
-        'studentEmail': 'alice@example.com',
-        'score': 0,
-        'totalQuestions': 20,
-        'submittedAt': null,
-        'status': 'in_progress',
-      },
-    ];
+  State<ExamSubmissionsScreen> createState() => _ExamSubmissionsScreenState();
+}
 
-    final completedCount = submissions.where((s) => s['status'] == 'completed').length;
-    final averageScore = submissions
-            .where((s) => s['status'] == 'completed')
-            .map((s) => s['score'] as int)
-            .fold(0, (a, b) => a + b) /
-        (completedCount > 0 ? completedCount : 1);
+class _ExamSubmissionsScreenState extends State<ExamSubmissionsScreen> {
+  late final CourseService _courseService;
+  List<ExamSubmission> _submissions = [];
+  bool _isLoading = true;
+  String? _error;
+
+  int get _examId => int.tryParse(widget.examId) ?? 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = CourseService(ApiClient());
+    _fetchSubmissions();
+  }
+
+  Future<void> _fetchSubmissions() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final submissions = await _courseService.fetchExamSubmissions(_examId);
+      setState(() {
+        _submissions = submissions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final completedCount = _submissions.length;
+    final averageScore = _submissions.isEmpty
+        ? 0
+        : _submissions.map((s) => s.score).fold(0.0, (a, b) => a + b) /
+            _submissions.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -65,44 +66,83 @@ class ExamSubmissionsScreen extends StatelessWidget {
         elevation: 0,
       ),
       drawer: const TeacherDrawer(),
-      body: Column(
-        children: [
-          // Stats Card
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).colorScheme.primary,
-                  Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem('Total', submissions.length.toString(), Colors.white),
-                _buildStatItem('Completed', completedCount.toString(), Colors.green[100]!),
-                _buildStatItem('Avg Score', averageScore.toStringAsFixed(1), Colors.blue[100]!),
-              ],
-            ),
-          ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Failed to load submissions',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _error!,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _fetchSubmissions,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
+                    // Stats Card
+                    Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Theme.of(context).colorScheme.primary,
+                            Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildStatItem('Total', _submissions.length.toString(), Colors.white),
+                          _buildStatItem('Completed', completedCount.toString(), Colors.green[100]!),
+                          _buildStatItem('Avg Score', averageScore.toStringAsFixed(1), Colors.blue[100]!),
+                        ],
+                      ),
+                    ),
 
-          // Submissions List
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: submissions.length,
-              itemBuilder: (context, index) {
-                final submission = submissions[index];
-                return _buildSubmissionCard(context, submission);
-              },
-            ),
-          ),
-        ],
-      ),
+                    if (_submissions.isEmpty)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            'No submissions yet',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _submissions.length,
+                          itemBuilder: (context, index) {
+                            final submission = _submissions[index];
+                            return _buildSubmissionCard(context, submission);
+                          },
+                        ),
+                      ),
+                  ],
+                ),
     );
   }
 
@@ -129,10 +169,8 @@ class ExamSubmissionsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSubmissionCard(BuildContext context, Map<String, dynamic> submission) {
-    final isCompleted = submission['status'] == 'completed';
-    final score = submission['score'] as int;
-    final percentage = (score / (submission['totalQuestions'] as int) * 100).round();
+  Widget _buildSubmissionCard(BuildContext context, ExamSubmission submission) {
+    final percentage = submission.score.round();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -141,79 +179,55 @@ class ExamSubmissionsScreen extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
-          backgroundColor: _getAvatarColor(isCompleted, percentage),
+          backgroundColor: _getAvatarColor(percentage),
           child: Text(
-            submission['studentName'].toString().substring(0, 1).toUpperCase(),
+            (submission.studentName.isNotEmpty ? submission.studentName : 'S')
+                .substring(0, 1)
+                .toUpperCase(),
             style: TextStyle(
-              color: _getTextColor(isCompleted, percentage),
+              color: _getTextColor(percentage),
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
         title: Text(
-          submission['studentName'] as String,
+          submission.studentName,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(submission['studentEmail'] as String),
+            Text(submission.studentEmail),
             const SizedBox(height: 4),
-            if (isCompleted) ...[
-              Text(
-                'Score: $score/${submission['totalQuestions']} ($percentage%)',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: _getScoreColor(percentage),
-                ),
+            Text(
+              'Score: ${submission.correctAnswers}/${submission.totalQuestions} ($percentage%)',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: _getScoreColor(percentage),
               ),
-              Text(
-                'Submitted: ${submission['submittedAt']}',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
-            ] else
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.blue[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'In Progress',
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+            ),
           ],
         ),
-        trailing: isCompleted
-            ? IconButton(
-                icon: const Icon(Icons.visibility),
-                onPressed: () {
-                  // View submission details
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Viewing ${submission['studentName']} submission (coming soon)')),
-                  );
-                },
-              )
-            : null,
+        trailing: IconButton(
+          icon: const Icon(Icons.visibility),
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Viewing ${submission.studentName} submission (coming soon)')),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Color _getAvatarColor(bool isCompleted, int percentage) {
-    if (!isCompleted) return Colors.grey[200]!;
+  Color _getAvatarColor(int percentage) {
     if (percentage >= 80) return Colors.green[100]!;
     if (percentage >= 60) return Colors.orange[100]!;
     return Colors.red[100]!;
   }
 
-  Color _getTextColor(bool isCompleted, int percentage) {
-    if (!isCompleted) return Colors.grey[800]!;
+  Color _getTextColor(int percentage) {
     if (percentage >= 80) return Colors.green[800]!;
     if (percentage >= 60) return Colors.orange[800]!;
     return Colors.red[800]!;

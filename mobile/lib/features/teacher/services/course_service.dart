@@ -87,6 +87,52 @@ class CourseService {
     }
   }
 
+  /// Fetch exam detail with questions
+  Future<ExamDetail> fetchExamDetail(int examId) async {
+    try {
+      final response = await _apiClient.get('/exams/$examId');
+      return ExamDetail.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Create exam with questions
+  Future<ExamDetail> createExam({
+    required int courseId,
+    required String title,
+    String? description,
+    required List<Map<String, dynamic>> questions,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        '/exams/',
+        data: {
+          'course_id': courseId,
+          'title': title,
+          'description': description,
+          'questions': questions,
+        },
+      );
+      return ExamDetail.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Fetch submissions for an exam (teacher)
+  Future<List<ExamSubmission>> fetchExamSubmissions(int examId) async {
+    try {
+      final response = await _apiClient.get('/exams/$examId/submissions');
+      final list = response.data as List<dynamic>;
+      return list
+          .map((json) => ExamSubmission.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Exception _handleError(DioException e) {
     if (e.response != null) {
       final statusCode = e.response!.statusCode;

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/api_client.dart';
+import '../../exams/models/exam_model.dart';
+import '../services/course_service.dart';
 
 class CreateExamScreen extends StatefulWidget {
   final String courseId;
@@ -22,6 +25,17 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
   final _durationController = TextEditingController(text: '30');
   final List<Map<String, dynamic>> _questions = [];
   bool _isSaving = false;
+  bool _isLoading = false;
+  late final CourseService _courseService;
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = CourseService(ApiClient());
+    if (widget.examId != null) {
+      _loadExamForEdit();
+    }
+  }
 
   @override
   void dispose() {
@@ -29,6 +43,44 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
     _descriptionController.dispose();
     _durationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadExamForEdit() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final examId = int.tryParse(widget.examId ?? '');
+      if (examId == null) return;
+
+      final exam = await _courseService.fetchExamDetail(examId);
+      _titleController.text = exam.title;
+      _descriptionController.text = exam.description ?? '';
+      _durationController.text = (exam.questions.length * 3).toString();
+
+      _questions
+        ..clear()
+        ..addAll(exam.questions.map((q) {
+          final options = [q.optionA, q.optionB, q.optionC, q.optionD];
+          final correctIndex = ['a', 'b', 'c', 'd']
+              .indexOf(q.correctOption.toLowerCase());
+          return {
+            'question': q.question,
+            'type': 'multiple_choice',
+            'options': options,
+            'correct_answer': correctIndex >= 0 ? correctIndex : 0,
+          };
+        }));
+    } catch (_) {
+      // ignore load errors for now
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _addQuestion() {
@@ -77,29 +129,91 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
       _isSaving = true;
     });
 
-    // Simulate save
-    await Future.delayed(const Duration(seconds: 2));
+    var isSuccess = false;
+
+    try {
+      if (widget.examId != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Edit exam is not supported yet.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else {
+        final courseId = int.tryParse(widget.courseId);
+        if (courseId == null) {
+          throw Exception('Invalid course id');
+        }
+
+        final payloadQuestions = _questions.map((q) {
+          final options = (q['options'] as List).map((o) => o.toString()).toList();
+          final isTrueFalse = q['type'] == 'true_false';
+          if (isTrueFalse && options.length >= 2) {
+            while (options.length < 4) {
+              options.add(options[options.length - 2]);
+            }
+          }
+          while (options.length < 4) {
+            options.add('');
+          }
+          final correctIndex = q['correct_answer'] as int;
+          final correctOption = String.fromCharCode('a'.codeUnitAt(0) + correctIndex);
+          return {
+            'question': q['question'] as String,
+            'option_a': options[0],
+            'option_b': options[1],
+            'option_c': options[2],
+            'option_d': options[3],
+            'correct_option': correctOption,
+          };
+        }).toList();
+
+        await _courseService.createExam(
+          courseId: courseId,
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+          questions: payloadQuestions,
+        );
+        isSuccess = true;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
 
     if (mounted) {
       setState(() {
         _isSaving = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.examId != null
-              ? 'Exam updated successfully!'
-              : 'Exam created successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      context.pop();
+      if (widget.examId == null && isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Exam created successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.pop();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.examId != null ? 'Edit Exam' : 'Create Exam'),
@@ -376,6 +490,18 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       }
       _correctAnswer = widget.question!['correct_answer'] as int;
     }
+
+    if (_questionType == 'multiple_choice') {
+      while (_optionControllers.length < 4) {
+        _optionControllers.add(TextEditingController());
+      }
+    } else if (_questionType == 'true_false') {
+      _optionControllers
+        ..clear()
+        ..add(TextEditingController(text: 'True'))
+        ..add(TextEditingController(text: 'False'));
+      _correctAnswer = 0;
+    }
   }
 
   @override
@@ -388,6 +514,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   }
 
   void _addOption() {
+    if (_questionType == 'true_false') return;
     setState(() {
       _optionControllers.add(TextEditingController());
     });
@@ -420,6 +547,13 @@ class _QuestionDialogState extends State<_QuestionDialog> {
     if (options.any((o) => o.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('All options must be filled')),
+      );
+      return;
+    }
+
+    if (_questionType == 'multiple_choice' && options.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add 4 options')),
       );
       return;
     }
@@ -473,6 +607,17 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                         _optionControllers.clear();
                         _optionControllers.add(TextEditingController(text: 'True'));
                         _optionControllers.add(TextEditingController(text: 'False'));
+                        _correctAnswer = 0;
+                      } else {
+                        while (_optionControllers.length < 4) {
+                          _optionControllers.add(TextEditingController());
+                        }
+                        if (_optionControllers.length > 4) {
+                          _optionControllers.removeRange(4, _optionControllers.length);
+                          if (_correctAnswer > 3) {
+                            _correctAnswer = 0;
+                          }
+                        }
                       }
                     });
                   },
@@ -535,7 +680,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                             },
                           ),
                         ),
-                        if (_optionControllers.length > 2)
+                        if (_questionType != 'true_false' && _optionControllers.length > 2)
                           IconButton(
                             icon: const Icon(Icons.remove_circle, color: Colors.red),
                             onPressed: () => _removeOption(index),
@@ -545,11 +690,12 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                   );
                 }),
                 const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: _addOption,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Option'),
-                ),
+                if (_questionType != 'true_false')
+                  TextButton.icon(
+                    onPressed: _addOption,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Option'),
+                  ),
                 const SizedBox(height: 8),
                 Text(
                   'Select the correct answer',
