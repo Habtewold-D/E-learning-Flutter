@@ -164,81 +164,85 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Widget _buildOverviewTab(
     BuildContext context,
   ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Course Info Card
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Course Information',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildInfoRow('Description', _course?.description ?? ''),
-                  const Divider(),
-                  _buildInfoRow('Students Enrolled', '—'),
-                  _buildInfoRow('Content Items', '${_contents.length}'),
-                  _buildInfoRow('Exams', '${_exams.length}'),
-                  _buildInfoRow('Created', _course?.createdAt?.toLocal().toString().split(' ').first ?? '—'),
-                ],
+    return RefreshIndicator(
+      onRefresh: _loadCourseData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Course Info Card
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Course Information',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInfoRow('Description', _course?.description ?? ''),
+                    const Divider(),
+                    _buildInfoRow('Students Enrolled', '—'),
+                    _buildInfoRow('Content Items', '${_contents.length}'),
+                    _buildInfoRow('Exams', '${_exams.length}'),
+                    _buildInfoRow('Created', _course?.createdAt?.toLocal().toString().split(' ').first ?? '—'),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // Quick Stats
-          Text(
-            'Quick Stats',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+            // Quick Stats
+            Text(
+              'Quick Stats',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    context,
+                    icon: Icons.people,
+                    title: 'Students',
+                    value: '—',
+                    color: Colors.blue,
+                  ),
                 ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  context,
-                  icon: Icons.people,
-                  title: 'Students',
-                  value: '—',
-                  color: Colors.blue,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatCard(
+                    context,
+                    icon: Icons.description,
+                    title: 'Content',
+                    value: '${_contents.length}',
+                    color: Colors.green,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  context,
-                  icon: Icons.description,
-                  title: 'Content',
-                  value: '${_contents.length}',
-                  color: Colors.green,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatCard(
+                    context,
+                    icon: Icons.quiz,
+                    title: 'Exams',
+                    value: '${_exams.length}',
+                    color: Colors.orange,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  context,
-                  icon: Icons.quiz,
-                  title: 'Exams',
-                  value: '${_exams.length}',
-                  color: Colors.orange,
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -246,116 +250,132 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Widget _buildContentTab(
     BuildContext context,
   ) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Course Content (${_contents.length})',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Content'),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _contents.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.description_outlined, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No content yet',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 18),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Upload First Content'),
-                      ),
-                    ],
+    return RefreshIndicator(
+      onRefresh: _loadCourseData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Course Content (${_contents.length})',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _contents.length,
-                  itemBuilder: (context, index) {
-                    final content = _contents[index];
-                    return _buildContentCard(context, content);
-                  },
+                  ElevatedButton.icon(
+                    onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Content'),
+                  ),
+                ],
+              ),
+            ),
+            if (_contents.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.description_outlined, size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No content yet',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
+                      icon: const Icon(Icons.upload_file),
+                      label: const Text('Upload First Content'),
+                    ),
+                  ],
                 ),
+              )
+            else
+              ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _contents.length,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final content = _contents[index];
+                  return _buildContentCard(context, content);
+                },
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildExamsTab(
     BuildContext context,
   ) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Exams (${_exams.length})',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => context.push('/teacher/courses/${widget.courseId}/create-exam'),
-                icon: const Icon(Icons.add),
-                label: const Text('Create Exam'),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _exams.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.quiz_outlined, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No exams yet',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 18),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed: () => context.push('/teacher/courses/${widget.courseId}/create-exam'),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Create First Exam'),
-                      ),
-                    ],
+    return RefreshIndicator(
+      onRefresh: _loadCourseData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Exams (${_exams.length})',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _exams.length,
-                  itemBuilder: (context, index) {
-                    final exam = _exams[index];
-                    return _buildExamCard(context, exam, widget.courseId);
-                  },
+                  ElevatedButton.icon(
+                    onPressed: () => context.push('/teacher/courses/${widget.courseId}/create-exam'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Create Exam'),
+                  ),
+                ],
+              ),
+            ),
+            if (_exams.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.quiz_outlined, size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No exams yet',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => context.push('/teacher/courses/${widget.courseId}/create-exam'),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Create First Exam'),
+                    ),
+                  ],
                 ),
+              )
+            else
+              ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _exams.length,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final exam = _exams[index];
+                  return _buildExamCard(context, exam, widget.courseId);
+                },
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 

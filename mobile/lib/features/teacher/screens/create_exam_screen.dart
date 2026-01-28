@@ -22,7 +22,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _durationController = TextEditingController(text: '30');
   final List<Map<String, dynamic>> _questions = [];
   bool _isSaving = false;
   bool _isLoading = false;
@@ -41,7 +40,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _durationController.dispose();
     super.dispose();
   }
 
@@ -57,7 +55,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
       final exam = await _courseService.fetchExamDetail(examId);
       _titleController.text = exam.title;
       _descriptionController.text = exam.description ?? '';
-      _durationController.text = (exam.questions.length * 3).toString();
 
       _questions
         ..clear()
@@ -303,30 +300,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Duration
-              TextFormField(
-                controller: _durationController,
-                decoration: InputDecoration(
-                  labelText: 'Duration (minutes) *',
-                  hintText: '30',
-                  prefixIcon: const Icon(Icons.timer),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter duration';
-                  }
-                  if (int.tryParse(value) == null || int.parse(value) <= 0) {
-                    return 'Please enter a valid duration';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-
               // Questions Section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -470,12 +443,12 @@ class _QuestionDialog extends StatefulWidget {
 class _QuestionDialogState extends State<_QuestionDialog> {
   final _formKey = GlobalKey<FormState>();
   final _questionController = TextEditingController();
+  final _optionAController = TextEditingController();
+  final _optionBController = TextEditingController();
+  final _optionCController = TextEditingController();
+  final _optionDController = TextEditingController();
   String _questionType = 'multiple_choice';
-  final List<TextEditingController> _optionControllers = [
-    TextEditingController(),
-    TextEditingController(),
-  ];
-  int _correctAnswer = 0;
+  String _correctOption = 'a';
 
   @override
   void initState() {
@@ -484,51 +457,32 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       _questionController.text = widget.question!['question'] as String;
       _questionType = widget.question!['type'] as String;
       final options = widget.question!['options'] as List;
-      _optionControllers.clear();
-      for (var option in options) {
-        _optionControllers.add(TextEditingController(text: option as String));
-      }
-      _correctAnswer = widget.question!['correct_answer'] as int;
+      final correctAnswer = widget.question!['correct_answer'] as int;
+      _correctOption = String.fromCharCode('a'.codeUnitAt(0) + correctAnswer);
+
+      _optionAController.text = options.isNotEmpty ? options[0].toString() : '';
+      _optionBController.text = options.length > 1 ? options[1].toString() : '';
+      _optionCController.text = options.length > 2 ? options[2].toString() : '';
+      _optionDController.text = options.length > 3 ? options[3].toString() : '';
     }
 
-    if (_questionType == 'multiple_choice') {
-      while (_optionControllers.length < 4) {
-        _optionControllers.add(TextEditingController());
-      }
-    } else if (_questionType == 'true_false') {
-      _optionControllers
-        ..clear()
-        ..add(TextEditingController(text: 'True'))
-        ..add(TextEditingController(text: 'False'));
-      _correctAnswer = 0;
+    if (_questionType == 'true_false') {
+      _optionAController.text = 'True';
+      _optionBController.text = 'False';
+      _optionCController.clear();
+      _optionDController.clear();
+      _correctOption = 'a';
     }
   }
 
   @override
   void dispose() {
     _questionController.dispose();
-    for (var controller in _optionControllers) {
-      controller.dispose();
-    }
+    _optionAController.dispose();
+    _optionBController.dispose();
+    _optionCController.dispose();
+    _optionDController.dispose();
     super.dispose();
-  }
-
-  void _addOption() {
-    if (_questionType == 'true_false') return;
-    setState(() {
-      _optionControllers.add(TextEditingController());
-    });
-  }
-
-  void _removeOption(int index) {
-    if (_optionControllers.length > 2) {
-      setState(() {
-        _optionControllers.removeAt(index);
-        if (_correctAnswer >= _optionControllers.length) {
-          _correctAnswer = 0;
-        }
-      });
-    }
   }
 
   void _saveQuestion() {
@@ -536,14 +490,18 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       return;
     }
 
-    if (_optionControllers.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least 2 options')),
-      );
-      return;
-    }
+    final options = _questionType == 'true_false'
+        ? [
+            _optionAController.text.trim(),
+            _optionBController.text.trim(),
+          ]
+        : [
+            _optionAController.text.trim(),
+            _optionBController.text.trim(),
+            _optionCController.text.trim(),
+            _optionDController.text.trim(),
+          ];
 
-    final options = _optionControllers.map((c) => c.text.trim()).toList();
     if (options.any((o) => o.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('All options must be filled')),
@@ -551,18 +509,13 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       return;
     }
 
-    if (_questionType == 'multiple_choice' && options.length < 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add 4 options')),
-      );
-      return;
-    }
+    final correctAnswerIndex = _correctOption.codeUnitAt(0) - 'a'.codeUnitAt(0);
 
     widget.onSave({
       'question': _questionController.text.trim(),
       'type': _questionType,
       'options': options,
-      'correct_answer': _correctAnswer,
+      'correct_answer': correctAnswerIndex,
     });
 
     Navigator.pop(context);
@@ -604,20 +557,11 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                     setState(() {
                       _questionType = value!;
                       if (_questionType == 'true_false') {
-                        _optionControllers.clear();
-                        _optionControllers.add(TextEditingController(text: 'True'));
-                        _optionControllers.add(TextEditingController(text: 'False'));
-                        _correctAnswer = 0;
-                      } else {
-                        while (_optionControllers.length < 4) {
-                          _optionControllers.add(TextEditingController());
-                        }
-                        if (_optionControllers.length > 4) {
-                          _optionControllers.removeRange(4, _optionControllers.length);
-                          if (_correctAnswer > 3) {
-                            _correctAnswer = 0;
-                          }
-                        }
+                        _optionAController.text = 'True';
+                        _optionBController.text = 'False';
+                        _optionCController.clear();
+                        _optionDController.clear();
+                        _correctOption = 'a';
                       }
                     });
                   },
@@ -649,57 +593,84 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                       ),
                 ),
                 const SizedBox(height: 8),
-                ..._optionControllers.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final controller = entry.value;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Radio<int>(
-                          value: index,
-                          groupValue: _correctAnswer,
-                          onChanged: (value) {
-                            setState(() {
-                              _correctAnswer = value!;
-                            });
-                          },
-                        ),
-                        Expanded(
-                          child: TextFormField(
-                            controller: controller,
-                            decoration: InputDecoration(
-                              hintText: 'Option ${index + 1}',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Required';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
-                        if (_questionType != 'true_false' && _optionControllers.length > 2)
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle, color: Colors.red),
-                            onPressed: () => _removeOption(index),
-                          ),
-                      ],
-                    ),
-                  );
-                }),
-                const SizedBox(height: 8),
-                if (_questionType != 'true_false')
-                  TextButton.icon(
-                    onPressed: _addOption,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Option'),
+                TextFormField(
+                  controller: _optionAController,
+                  decoration: InputDecoration(
+                    hintText: 'Option A',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Required';
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 8),
-                Text(
-                  'Select the correct answer',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                TextFormField(
+                  controller: _optionBController,
+                  decoration: InputDecoration(
+                    hintText: 'Option B',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Required';
+                    }
+                    return null;
+                  },
+                ),
+                if (_questionType == 'multiple_choice') ...[
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _optionCController,
+                    decoration: InputDecoration(
+                      hintText: 'Option C',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Required';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _optionDController,
+                    decoration: InputDecoration(
+                      hintText: 'Option D',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Required';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _correctOption,
+                  decoration: const InputDecoration(labelText: 'Correct Option'),
+                  items: _questionType == 'true_false'
+                      ? const [
+                          DropdownMenuItem(value: 'a', child: Text('True')),
+                          DropdownMenuItem(value: 'b', child: Text('False')),
+                        ]
+                      : const [
+                          DropdownMenuItem(value: 'a', child: Text('Option A')),
+                          DropdownMenuItem(value: 'b', child: Text('Option B')),
+                          DropdownMenuItem(value: 'c', child: Text('Option C')),
+                          DropdownMenuItem(value: 'd', child: Text('Option D')),
+                        ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _correctOption = value;
+                    });
+                  },
                 ),
                 const SizedBox(height: 16),
 
