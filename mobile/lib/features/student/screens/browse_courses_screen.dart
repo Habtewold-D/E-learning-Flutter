@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../courses/models/course_browse_model.dart';
+import '../services/course_service.dart';
 
 class BrowseCoursesScreen extends StatefulWidget {
   const BrowseCoursesScreen({super.key});
@@ -11,82 +14,58 @@ class BrowseCoursesScreen extends StatefulWidget {
 }
 
 class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
-  // Mock available courses
-  final List<Map<String, dynamic>> _allCourses = [
-    {
-      'id': 1,
-      'title': 'Introduction to Flutter',
-      'description': 'Learn Flutter from scratch with hands-on projects',
-      'teacher': 'John Teacher',
-      'students': 15,
-      'contentCount': 8,
-      'isEnrolled': true,
-    },
-    {
-      'id': 2,
-      'title': 'Advanced React Development',
-      'description': 'Master React hooks, context, and advanced patterns',
-      'teacher': 'Jane Instructor',
-      'students': 12,
-      'contentCount': 12,
-      'isEnrolled': true,
-    },
-    {
-      'id': 3,
-      'title': 'Python Basics for Beginners',
-      'description': 'Start your programming journey with Python',
-      'teacher': 'Bob Teacher',
-      'students': 8,
-      'contentCount': 10,
-      'isEnrolled': true,
-    },
-    {
-      'id': 4,
-      'title': 'Database Design & SQL',
-      'description': 'Learn to design and query databases effectively',
-      'teacher': 'Alice Teacher',
-      'students': 5,
-      'contentCount': 6,
-      'isEnrolled': false,
-    },
-    {
-      'id': 5,
-      'title': 'Mobile App UI/UX Design',
-      'description': 'Create beautiful and intuitive mobile interfaces',
-      'teacher': 'Charlie Designer',
-      'students': 2,
-      'contentCount': 4,
-      'isEnrolled': false,
-    },
-    {
-      'id': 6,
-      'title': 'Web Development Fundamentals',
-      'description': 'HTML, CSS, and JavaScript basics',
-      'teacher': 'David Developer',
-      'students': 20,
-      'contentCount': 15,
-      'isEnrolled': false,
-    },
-  ];
+  late final StudentCourseService _courseService;
+  List<CourseBrowse> _allCourses = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   String _searchQuery = '';
   String _filter = 'all'; // 'all', 'enrolled', 'available'
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = StudentCourseService(ApiClient());
+    _loadCourses();
+  }
+
+  Future<void> _loadCourses() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final courses = await _courseService.fetchBrowseCourses();
+      if (!mounted) return;
+      setState(() {
+        _allCourses = courses;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final filteredCourses = _allCourses.where((course) {
       // Search filter
       if (_searchQuery.isNotEmpty) {
-        final matchesSearch = course['title'].toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            course['description'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
+        final matchesSearch = course.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            (course.description ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
         if (!matchesSearch) return false;
       }
 
       // Enrollment filter
       if (_filter == 'enrolled') {
-        return course['isEnrolled'] == true;
+        return course.isEnrolled == true;
       } else if (_filter == 'available') {
-        return course['isEnrolled'] == false;
+        return course.isEnrolled == false;
       }
       return true;
     }).toList();
@@ -105,9 +84,12 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
             child: Column(
               children: [
                 TextField(
+                  style: const TextStyle(color: Colors.black87),
                   decoration: InputDecoration(
                     hintText: 'Search courses...',
                     prefixIcon: const Icon(Icons.search),
+                    hintStyle: const TextStyle(color: Colors.black54),
+                    prefixIconColor: Colors.black54,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -160,33 +142,57 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
 
           // Courses List
           Expanded(
-            child: filteredCourses.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.book_outlined, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No courses found',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 18),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                              const SizedBox(height: 12),
+                              Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.red[400], fontSize: 14),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: _loadCourses,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: () async {
-                      await Future.delayed(const Duration(seconds: 1));
-                    },
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: filteredCourses.length,
-                      itemBuilder: (context, index) {
-                        final course = filteredCourses[index];
-                        return _buildCourseCard(course);
-                      },
-                    ),
-                  ),
+                      )
+                    : filteredCourses.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.book_outlined, size: 64, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No courses found',
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                                ),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadCourses,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: filteredCourses.length,
+                              itemBuilder: (context, index) {
+                                final course = filteredCourses[index];
+                                return _buildCourseCard(course);
+                              },
+                            ),
+                          ),
           ),
         ],
       ),
@@ -194,15 +200,15 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
     );
   }
 
-  Widget _buildCourseCard(Map<String, dynamic> course) {
-    final isEnrolled = course['isEnrolled'] as bool;
+  Widget _buildCourseCard(CourseBrowse course) {
+    final isEnrolled = course.isEnrolled;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () => context.push('/student/courses/${course['id']}'),
+        onTap: () => context.push('/student/courses/${course.id}'),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -229,7 +235,7 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                           children: [
                             Expanded(
                               child: Text(
-                                course['title'] as String,
+                                course.title,
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -256,7 +262,7 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          course['description'] as String,
+                          course.description ?? 'No description available',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -275,21 +281,21 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                   Icon(Icons.person, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
-                    course['teacher'] as String,
+                    course.teacherName,
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                   const SizedBox(width: 16),
                   Icon(Icons.people, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
-                    '${course['students']} students',
+                    '${course.studentsCount} students',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                   const SizedBox(width: 16),
                   Icon(Icons.description, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
-                    '${course['contentCount']} content',
+                    '${course.contentCount} content',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                 ],
@@ -300,7 +306,7 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (isEnrolled) {
-                      context.push('/student/courses/${course['id']}');
+                      context.push('/student/courses/${course.id}');
                     } else {
                       _enrollInCourse(course);
                     }
@@ -321,29 +327,49 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
     );
   }
 
-  void _enrollInCourse(Map<String, dynamic> course) {
+  Future<void> _enrollInCourse(CourseBrowse course) async {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Enroll in Course'),
-        content: Text('Are you sure you want to enroll in "${course['title']}"?'),
+        content: Text('Are you sure you want to enroll in "${course.title}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              setState(() {
-                course['isEnrolled'] = true;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Successfully enrolled in ${course['title']}'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              try {
+                await _courseService.enrollInCourse(course.id);
+                if (!mounted) return;
+                setState(() {
+                  _allCourses = _allCourses.map((item) {
+                    if (item.id == course.id) {
+                      return item.copyWith(
+                        isEnrolled: true,
+                        studentsCount: item.studentsCount + 1,
+                      );
+                    }
+                    return item;
+                  }).toList();
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Successfully enrolled in ${course.title}'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString().replaceAll('Exception: ', '')),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             child: const Text('Enroll'),
           ),

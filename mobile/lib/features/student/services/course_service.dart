@@ -1,14 +1,48 @@
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../courses/models/course_model.dart';
+import '../../courses/models/course_browse_model.dart';
 import '../../courses/models/course_content_model.dart';
 import '../../courses/models/course_progress_model.dart';
+import '../../courses/models/enrolled_course_model.dart';
 import '../../exams/models/exam_model.dart';
 
 class StudentCourseService {
   final ApiClient _apiClient;
 
   StudentCourseService(this._apiClient);
+
+  Future<List<CourseBrowse>> fetchBrowseCourses() async {
+    try {
+      final response = await _apiClient.get('/courses/browse');
+      final list = response.data as List<dynamic>;
+      return list
+          .map((json) => CourseBrowse.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> enrollInCourse(int courseId) async {
+    try {
+      await _apiClient.post('/courses/$courseId/enroll');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<EnrolledCourse>> fetchEnrolledCourses() async {
+    try {
+      final response = await _apiClient.get('/courses/enrolled/me');
+      final list = response.data as List<dynamic>;
+      return list
+          .map((json) => EnrolledCourse.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
 
   Future<Course> fetchCourseDetail(int courseId) async {
     try {

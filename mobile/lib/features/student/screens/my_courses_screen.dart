@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../courses/models/enrolled_course_model.dart';
+import '../services/course_service.dart';
 
 class MyCoursesScreen extends StatefulWidget {
   const MyCoursesScreen({super.key});
@@ -11,44 +14,47 @@ class MyCoursesScreen extends StatefulWidget {
 }
 
 class _MyCoursesScreenState extends State<MyCoursesScreen> {
-  // Mock enrolled courses
-  final List<Map<String, dynamic>> _courses = [
-    {
-      'id': 1,
-      'title': 'Introduction to Flutter',
-      'description': 'Learn Flutter from scratch with hands-on projects',
-      'progress': 45,
-      'contentCount': 8,
-      'completedContent': 3,
-      'lastAccessed': '2 hours ago',
-    },
-    {
-      'id': 2,
-      'title': 'Advanced React Development',
-      'description': 'Master React hooks, context, and advanced patterns',
-      'progress': 78,
-      'contentCount': 12,
-      'completedContent': 9,
-      'lastAccessed': '1 day ago',
-    },
-    {
-      'id': 3,
-      'title': 'Python Basics for Beginners',
-      'description': 'Start your programming journey with Python',
-      'progress': 30,
-      'contentCount': 10,
-      'completedContent': 3,
-      'lastAccessed': '3 days ago',
-    },
-  ];
+  late final StudentCourseService _courseService;
+  List<EnrolledCourse> _courses = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = StudentCourseService(ApiClient());
+    _loadCourses();
+  }
+
+  Future<void> _loadCourses() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final courses = await _courseService.fetchEnrolledCourses();
+      if (!mounted) return;
+      setState(() {
+        _courses = courses;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final filteredCourses = _courses.where((course) {
       if (_searchQuery.isEmpty) return true;
-      return course['title'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
+      return course.title.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
 
     return Scaffold(
@@ -63,9 +69,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
+              style: const TextStyle(color: Colors.black87),
               decoration: InputDecoration(
                 hintText: 'Search your courses...',
                 prefixIcon: const Icon(Icons.search),
+                hintStyle: const TextStyle(color: Colors.black54),
+                prefixIconColor: Colors.black54,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -82,50 +91,74 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
           // Courses List
           Expanded(
-            child: filteredCourses.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.book_outlined,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.isEmpty
-                              ? 'No enrolled courses yet'
-                              : 'No courses found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                              const SizedBox(height: 12),
+                              Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.red[400], fontSize: 14),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: _loadCourses,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                            ],
                           ),
                         ),
-                        if (_searchQuery.isEmpty) ...[
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: () => context.go('/student/browse'),
-                            icon: const Icon(Icons.explore),
-                            label: const Text('Browse Courses'),
+                      )
+                    : filteredCourses.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.book_outlined,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _searchQuery.isEmpty
+                                      ? 'No enrolled courses yet'
+                                      : 'No courses found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                if (_searchQuery.isEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => context.go('/student/browse'),
+                                    icon: const Icon(Icons.explore),
+                                    label: const Text('Browse Courses'),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadCourses,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: filteredCourses.length,
+                              itemBuilder: (context, index) {
+                                final course = filteredCourses[index];
+                                return _buildCourseCard(course);
+                              },
+                            ),
                           ),
-                        ],
-                      ],
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: () async {
-                      await Future.delayed(const Duration(seconds: 1));
-                    },
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: filteredCourses.length,
-                      itemBuilder: (context, index) {
-                        final course = filteredCourses[index];
-                        return _buildCourseCard(course);
-                      },
-                    ),
-                  ),
           ),
         ],
       ),
@@ -133,17 +166,17 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
     );
   }
 
-  Widget _buildCourseCard(Map<String, dynamic> course) {
-    final progress = course['progress'] as int;
-    final completedContent = course['completedContent'] as int;
-    final contentCount = course['contentCount'] as int;
+  Widget _buildCourseCard(EnrolledCourse course) {
+    final progress = course.progress;
+    final completedContent = course.completedContent;
+    final contentCount = course.contentCount;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () => context.push('/student/courses/${course['id']}'),
+        onTap: () => context.push('/student/courses/${course.id}'),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -167,7 +200,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          course['title'] as String,
+                          course.title,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -175,7 +208,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          course['description'] as String,
+                          course.description ?? 'No description available',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -212,7 +245,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '$progress% Complete',
+                          '${progress.toStringAsFixed(0)}% Complete',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 11,
@@ -233,10 +266,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                   const Spacer(),
-                  Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
-                  const SizedBox(width: 4),
                   Text(
-                    course['lastAccessed'] as String,
+                    'Progress',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                 ],
@@ -245,7 +276,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => context.push('/student/courses/${course['id']}'),
+                  onPressed: () => context.push('/student/courses/${course.id}'),
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Continue Learning'),
                   style: ElevatedButton.styleFrom(
