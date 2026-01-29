@@ -6,6 +6,7 @@ import '../../../core/api/api_client.dart';
 import '../../courses/models/course_model.dart';
 import '../../courses/models/course_content_model.dart';
 import '../../exams/models/exam_model.dart';
+import 'content_viewer_screen.dart';
 import '../services/course_service.dart';
 
 class CourseDetailScreen extends StatefulWidget {
@@ -451,6 +452,17 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           isPdf ? 'PDF Document' : 'Video',
           style: TextStyle(color: Colors.grey[600]),
         ),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TeacherContentViewerScreen(
+                title: content.title,
+                type: content.type,
+                url: content.url,
+              ),
+            ),
+          );
+        },
         trailing: PopupMenuButton(
           itemBuilder: (context) => [
             const PopupMenuItem(

@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi_utils.tasks import repeat_every
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
@@ -12,6 +13,9 @@ app = FastAPI(
     description="Backend API for e-learning platform with RAG capabilities",
     version="1.0.0"
 )
+
+# Serve uploaded files
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 # CORS Configuration
 app.add_middleware(
