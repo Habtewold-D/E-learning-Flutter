@@ -1,6 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../exams/models/exam_model.dart';
+import '../services/course_service.dart';
 
 class TakeExamScreen extends StatefulWidget {
   final String examId;
@@ -11,60 +16,90 @@ class TakeExamScreen extends StatefulWidget {
 }
 
 class _TakeExamScreenState extends State<TakeExamScreen> {
-  int _currentQuestionIndex = 0;
-  Map<int, int?> _answers = {}; // question index -> selected option index
-  int _timeRemaining = 3600; // seconds (60 minutes)
+  late final StudentCourseService _courseService;
+  ExamDetail? _exam;
+  bool _isLoading = true;
+  String? _error;
 
-  // Mock exam questions
-  final List<Map<String, dynamic>> _questions = [
-    {
-      'id': 1,
-      'question': 'What is Flutter?',
-      'type': 'multiple_choice',
-      'options': [
-        'A web framework',
-        'A mobile app framework',
-        'A database',
-        'A programming language',
-      ],
-      'correctAnswer': 1,
-    },
-    {
-      'id': 2,
-      'question': 'Which widget is used for state management in Flutter?',
-      'type': 'multiple_choice',
-      'options': [
-        'StatefulWidget',
-        'StatelessWidget',
-        'Both',
-        'None',
-      ],
-      'correctAnswer': 0,
-    },
-    {
-      'id': 3,
-      'question': 'Flutter uses Dart programming language.',
-      'type': 'true_false',
-      'options': ['True', 'False'],
-      'correctAnswer': 0,
-    },
-  ];
+  int _currentQuestionIndex = 0;
+  final Map<int, int?> _answers = {}; // question index -> selected option index
+  int _timeRemaining = 0; // seconds
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
+    _courseService = StudentCourseService(ApiClient());
+    _loadExam();
   }
 
-  void _startTimer() {
-    // Mock timer - in real app, use Timer.periodic
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted && _timeRemaining > 0) {
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadExam() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final examId = int.tryParse(widget.examId);
+    if (examId == null) {
+      setState(() {
+        _error = 'Invalid exam id';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final exam = await _courseService.fetchExamDetail(examId);
+      if (!mounted) return;
+      setState(() {
+        _exam = exam;
+        _isLoading = false;
+      });
+      await _markInProgress(examId);
+      _initializeTimer();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _markInProgress(int examId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList('in_progress_exams') ?? <String>[];
+    if (!ids.contains(examId.toString())) {
+      ids.add(examId.toString());
+      await prefs.setStringList('in_progress_exams', ids);
+    }
+  }
+
+  Future<void> _clearInProgress(int examId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList('in_progress_exams') ?? <String>[];
+    ids.remove(examId.toString());
+    await prefs.setStringList('in_progress_exams', ids);
+  }
+
+  void _initializeTimer() {
+    final questionsCount = _exam?.questions.length ?? 0;
+    _timeRemaining = questionsCount * 3 * 60;
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_timeRemaining > 0) {
         setState(() {
           _timeRemaining--;
         });
-        _startTimer();
-      } else if (_timeRemaining == 0) {
+      } else {
+        timer.cancel();
         _autoSubmit();
       }
     });
@@ -100,24 +135,94 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     );
   }
 
-  void _submitExam() {
-    // Calculate score
-    int correct = 0;
-    for (int i = 0; i < _questions.length; i++) {
-      if (_answers[i] == _questions[i]['correctAnswer']) {
-        correct++;
-      }
-    }
-    final score = ((correct / _questions.length) * 100).round();
+  Future<void> _submitExam() async {
+    final examId = int.tryParse(widget.examId);
+    if (examId == null || _exam == null) return;
 
-    // Navigate to results
-    context.pushReplacement('/student/exams/${widget.examId}/results?score=$score');
+    final answers = <int, String>{};
+    for (int i = 0; i < _exam!.questions.length; i++) {
+      final selectedIndex = _answers[i];
+      if (selectedIndex == null) continue;
+      answers[_exam!.questions[i].id] = _indexToOption(selectedIndex);
+    }
+
+    try {
+      final result = await _courseService.submitExam(examId, answers);
+      await _clearInProgress(examId);
+      if (!mounted) return;
+      final answersForReview = answers.map((key, value) => MapEntry(key.toString(), value));
+      context.pushReplacement(
+        '/student/exams/${widget.examId}/results',
+        extra: {
+          'result': result,
+          'answers': answersForReview,
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    }
+  }
+
+  String _indexToOption(int index) {
+    switch (index) {
+      case 0:
+        return 'a';
+      case 1:
+        return 'b';
+      case 2:
+        return 'c';
+      case 3:
+        return 'd';
+      default:
+        return 'a';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentQuestion = _questions[_currentQuestionIndex];
-    final isLastQuestion = _currentQuestionIndex == _questions.length - 1;
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Taking Exam')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                const SizedBox(height: 12),
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: _loadExam,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final questions = _exam?.questions ?? [];
+    final currentQuestion = questions[_currentQuestionIndex];
+    final isLastQuestion = _currentQuestionIndex == questions.length - 1;
+
+    final options = [
+      currentQuestion.optionA,
+      currentQuestion.optionB,
+      currentQuestion.optionC,
+      currentQuestion.optionD,
+    ].where((value) => value.isNotEmpty).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -143,23 +248,20 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       drawer: const StudentDrawer(),
       body: Column(
         children: [
-          // Progress Bar
           LinearProgressIndicator(
-            value: (_currentQuestionIndex + 1) / _questions.length,
+            value: questions.isEmpty ? 0 : (_currentQuestionIndex + 1) / questions.length,
             backgroundColor: Colors.grey[200],
             valueColor: AlwaysStoppedAnimation<Color>(
               Theme.of(context).colorScheme.secondary,
             ),
           ),
-
-          // Question Counter
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Question ${_currentQuestionIndex + 1} of ${_questions.length}',
+                  'Question ${_currentQuestionIndex + 1} of ${questions.length}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -192,8 +294,6 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
               ],
             ),
           ),
-
-          // Question Content
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
@@ -201,13 +301,13 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    currentQuestion['question'] as String,
+                    currentQuestion.question,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
                   const SizedBox(height: 24),
-                  ...(currentQuestion['options'] as List).asMap().entries.map((entry) {
+                  ...options.asMap().entries.map((entry) {
                     final optionIndex = entry.key;
                     final optionText = entry.value;
                     final isSelected = _answers[_currentQuestionIndex] == optionIndex;
@@ -265,8 +365,6 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
               ),
             ),
           ),
-
-          // Navigation Buttons
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
@@ -296,6 +394,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
+                      if (questions.isEmpty) return;
                       if (isLastQuestion) {
                         _submitExam();
                       } else {

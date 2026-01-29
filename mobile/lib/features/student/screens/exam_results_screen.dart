@@ -1,18 +1,113 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../exams/models/exam_model.dart';
+import '../services/course_service.dart';
 
-class ExamResultsScreen extends StatelessWidget {
+class ExamResultsScreen extends StatefulWidget {
   final String examId;
   final String? score;
-  const ExamResultsScreen({super.key, required this.examId, this.score});
+  final ExamResult? result;
+  final Map<String, String>? answers;
+  const ExamResultsScreen({
+    super.key,
+    required this.examId,
+    this.score,
+    this.result,
+    this.answers,
+  });
+
+  @override
+  State<ExamResultsScreen> createState() => _ExamResultsScreenState();
+}
+
+class _ExamResultsScreenState extends State<ExamResultsScreen> {
+  late final StudentCourseService _courseService;
+  ExamResult? _result;
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = StudentCourseService(ApiClient());
+    _result = widget.result as ExamResult?;
+    if (_result == null) {
+      _loadResult();
+    }
+  }
+
+  Future<void> _loadResult() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final examId = int.tryParse(widget.examId);
+    if (examId == null) {
+      setState(() {
+        _error = 'Invalid exam id';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final result = await _courseService.fetchMyExamResult(examId);
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Parse score from query parameter or use mock
-    final int finalScore = score != null ? int.tryParse(score!) ?? 0 : 85;
-    final int totalQuestions = 20;
-    final int correctAnswers = ((finalScore / 100) * totalQuestions).round();
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Exam Results'),
+          elevation: 0,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                const SizedBox(height: 12),
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: _loadResult,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final parsedScore = widget.score != null ? double.tryParse(widget.score!) : null;
+    final double finalScore = _result?.score ?? parsedScore ?? 0;
+    final int totalQuestions = _result?.totalQuestions ?? 0;
+    final int correctAnswers = _result?.correctAnswers ?? ((finalScore / 100) * totalQuestions).round();
 
     Color scoreColor;
     String scoreMessage;
@@ -62,7 +157,7 @@ class ExamResultsScreen extends StatelessWidget {
                     Icon(scoreIcon, size: 64, color: Colors.white),
                     const SizedBox(height: 16),
                     Text(
-                      '$finalScore%',
+                      '${finalScore.toStringAsFixed(0)}%',
                       style: const TextStyle(
                         fontSize: 64,
                         fontWeight: FontWeight.bold,
@@ -154,8 +249,11 @@ class ExamResultsScreen extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Review answers functionality coming soon!')),
+                  context.push(
+                    '/student/exams/${widget.examId}/review',
+                    extra: {
+                      'answers': widget.answers,
+                    },
                   );
                 },
                 icon: const Icon(Icons.visibility),

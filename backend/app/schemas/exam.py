@@ -77,3 +77,14 @@ class ResultWithStudentResponse(ResultResponse):
     student_name: str
     student_email: str
 
+
+class StudentExamListResponse(BaseModel):
+    id: int
+    course_id: int
+    course_title: str
+    title: str
+    description: Optional[str]
+    questions_count: int
+    status: str  # 'available' or 'completed'
+    score: Optional[float] = None
+

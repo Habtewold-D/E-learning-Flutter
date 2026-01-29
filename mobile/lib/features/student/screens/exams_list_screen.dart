@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../exams/models/exam_model.dart';
+import '../services/course_service.dart';
 
 class ExamsListScreen extends StatefulWidget {
   final String? courseId;
@@ -11,51 +15,56 @@ class ExamsListScreen extends StatefulWidget {
 }
 
 class _ExamsListScreenState extends State<ExamsListScreen> {
-  // Mock exams data
-  final List<Map<String, dynamic>> _exams = [
-    {
-      'id': 1,
-      'title': 'Midterm Exam - Flutter Basics',
-      'course': 'Introduction to Flutter',
-      'duration': 60,
-      'totalQuestions': 20,
-      'status': 'available', // 'available', 'in_progress', 'completed'
-      'score': null,
-      'dueDate': '2024-12-30',
-    },
-    {
-      'id': 2,
-      'title': 'Final Exam - React Advanced',
-      'course': 'Advanced React Development',
-      'duration': 90,
-      'totalQuestions': 30,
-      'status': 'completed',
-      'score': 85,
-      'dueDate': '2024-12-25',
-    },
-    {
-      'id': 3,
-      'title': 'Quiz 1 - Python Basics',
-      'course': 'Python Basics for Beginners',
-      'duration': 30,
-      'totalQuestions': 10,
-      'status': 'in_progress',
-      'score': null,
-      'dueDate': '2024-12-28',
-    },
-  ];
+  late final StudentCourseService _courseService;
+  List<StudentExamListItem> _exams = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   String _filter = 'all'; // 'all', 'available', 'in_progress', 'completed'
 
   @override
+  void initState() {
+    super.initState();
+    _courseService = StudentCourseService(ApiClient());
+    _loadExams();
+  }
+
+  Future<void> _loadExams() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final courseId = widget.courseId != null ? int.tryParse(widget.courseId!) : null;
+      final exams = await _courseService.fetchMyExams(courseId: courseId);
+      final prefs = await SharedPreferences.getInstance();
+      final inProgressIds = prefs.getStringList('in_progress_exams') ?? <String>[];
+      final updated = exams.map((exam) {
+        if (exam.status != 'completed' && inProgressIds.contains(exam.id.toString())) {
+          return exam.copyWith(status: 'in_progress');
+        }
+        return exam;
+      }).toList();
+      if (!mounted) return;
+      setState(() {
+        _exams = updated;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final filteredExams = _exams.where((exam) {
-      if (widget.courseId != null) {
-        // Filter by course if courseId is provided
-        return exam['course'].toString().contains('Flutter'); // Mock filter
-      }
       if (_filter == 'all') return true;
-      return exam['status'] == _filter;
+      return exam.status == _filter;
     }).toList();
 
     return Scaffold(
@@ -116,37 +125,63 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
 
           // Exams List
           Expanded(
-            child: filteredExams.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.quiz_outlined, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No exams found',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 18),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                              const SizedBox(height: 12),
+                              Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.red[400], fontSize: 14),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: _loadExams,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: filteredExams.length,
-                    itemBuilder: (context, index) {
-                      final exam = filteredExams[index];
-                      return _buildExamCard(exam);
-                    },
-                  ),
+                      )
+                    : filteredExams.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.quiz_outlined, size: 64, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No exams found',
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: filteredExams.length,
+                            itemBuilder: (context, index) {
+                              final exam = filteredExams[index];
+                              return _buildExamCard(exam);
+                            },
+                          ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildExamCard(Map<String, dynamic> exam) {
-    final status = exam['status'] as String;
-    final score = exam['score'] as int?;
+  Widget _buildExamCard(StudentExamListItem exam) {
+    final status = exam.status;
+    final score = exam.score;
 
     Color statusColor;
     String statusText;
@@ -181,9 +216,9 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
       child: InkWell(
         onTap: () {
           if (status == 'available' || status == 'in_progress') {
-            context.push('/student/exams/${exam['id']}/take');
+            context.push('/student/exams/${exam.id}/take');
           } else if (status == 'completed') {
-            context.push('/student/exams/${exam['id']}/results');
+            context.push('/student/exams/${exam.id}/results');
           }
         },
         borderRadius: BorderRadius.circular(12),
@@ -204,7 +239,7 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          exam['title'] as String,
+                          exam.title,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -212,7 +247,7 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          exam['course'] as String,
+                          exam.courseTitle,
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -241,17 +276,10 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.timer, size: 16, color: Colors.grey[600]),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Duration: ${exam['duration']} mins',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                  ),
-                  const SizedBox(width: 16),
                   Icon(Icons.help_outline, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
-                    '${exam['totalQuestions']} questions',
+                    '${exam.questionsCount} questions',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                   const Spacer(),
@@ -263,7 +291,7 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        'Score: $score%',
+                        'Score: ${score.toStringAsFixed(0)}%',
                         style: TextStyle(
                           color: Colors.green[800],
                           fontSize: 12,
@@ -280,9 +308,9 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (status == 'available' || status == 'in_progress') {
-                      context.push('/student/exams/${exam['id']}/take');
+                      context.push('/student/exams/${exam.id}/take');
                     } else if (status == 'completed') {
-                      context.push('/student/exams/${exam['id']}/results');
+                      context.push('/student/exams/${exam.id}/results');
                     }
                   },
                   style: ElevatedButton.styleFrom(

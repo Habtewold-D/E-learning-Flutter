@@ -120,3 +120,89 @@ class ExamSubmission {
     );
   }
 }
+
+class StudentExamListItem {
+  final int id;
+  final int courseId;
+  final String courseTitle;
+  final String title;
+  final String? description;
+  final int questionsCount;
+  final String status; // 'available' or 'completed'
+  final double? score;
+
+  StudentExamListItem({
+    required this.id,
+    required this.courseId,
+    required this.courseTitle,
+    required this.title,
+    this.description,
+    required this.questionsCount,
+    required this.status,
+    this.score,
+  });
+
+  factory StudentExamListItem.fromJson(Map<String, dynamic> json) {
+    return StudentExamListItem(
+      id: json['id'] as int,
+      courseId: json['course_id'] as int,
+      courseTitle: json['course_title'] as String? ?? '',
+      title: json['title'] as String,
+      description: json['description'] as String?,
+      questionsCount: json['questions_count'] as int? ?? 0,
+      status: json['status'] as String? ?? 'available',
+      score: (json['score'] as num?)?.toDouble(),
+    );
+  }
+
+  StudentExamListItem copyWith({
+    int? id,
+    int? courseId,
+    String? courseTitle,
+    String? title,
+    String? description,
+    int? questionsCount,
+    String? status,
+    double? score,
+  }) {
+    return StudentExamListItem(
+      id: id ?? this.id,
+      courseId: courseId ?? this.courseId,
+      courseTitle: courseTitle ?? this.courseTitle,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      questionsCount: questionsCount ?? this.questionsCount,
+      status: status ?? this.status,
+      score: score ?? this.score,
+    );
+  }
+}
+
+class ExamResult {
+  final int id;
+  final int examId;
+  final int studentId;
+  final double score;
+  final int totalQuestions;
+  final int correctAnswers;
+
+  ExamResult({
+    required this.id,
+    required this.examId,
+    required this.studentId,
+    required this.score,
+    required this.totalQuestions,
+    required this.correctAnswers,
+  });
+
+  factory ExamResult.fromJson(Map<String, dynamic> json) {
+    return ExamResult(
+      id: json['id'] as int,
+      examId: json['exam_id'] as int,
+      studentId: json['student_id'] as int,
+      score: (json['score'] as num).toDouble(),
+      totalQuestions: json['total_questions'] as int,
+      correctAnswers: json['correct_answers'] as int,
+    );
+  }
+}

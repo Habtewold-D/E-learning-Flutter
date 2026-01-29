@@ -13,6 +13,7 @@ import '../../features/student/screens/content_viewer_screen.dart';
 import '../../features/student/screens/exams_list_screen.dart';
 import '../../features/student/screens/take_exam_screen.dart';
 import '../../features/student/screens/exam_results_screen.dart';
+import '../../features/student/screens/review_answers_screen.dart';
 import '../../features/student/screens/rag_chat_screen.dart';
 import '../../features/student/screens/live_classes_screen.dart';
 import '../../features/student/screens/live_class_join_screen.dart';
@@ -280,7 +281,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final examId = state.pathParameters['examId']!;
           final score = state.uri.queryParameters['score'];
-          return ExamResultsScreen(examId: examId, score: score);
+          final extra = state.extra as Map<String, dynamic>?;
+          final result = extra?['result'];
+          final answers = extra?['answers'] as Map<String, String>?;
+          return ExamResultsScreen(
+            examId: examId,
+            score: score,
+            result: result,
+            answers: answers,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/student/exams/:examId/review',
+        name: 'student-exam-review',
+        builder: (context, state) {
+          final examId = state.pathParameters['examId']!;
+          final extra = state.extra as Map<String, dynamic>?;
+          final answers = extra?['answers'] as Map<String, String>?;
+          return ReviewAnswersScreen(examId: examId, answers: answers);
         },
       ),
       GoRoute(

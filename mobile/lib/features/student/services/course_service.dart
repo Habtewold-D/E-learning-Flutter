@@ -87,6 +87,56 @@ class StudentCourseService {
     }
   }
 
+  Future<ExamDetail> fetchExamDetail(int examId) async {
+    try {
+      final response = await _apiClient.get('/exams/$examId');
+      return ExamDetail.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<ExamResult> submitExam(int examId, Map<int, String> answers) async {
+    try {
+      final payloadAnswers = answers.map((key, value) => MapEntry(key.toString(), value));
+      final response = await _apiClient.post(
+        '/exams/$examId/submit',
+        data: {
+          'answers': payloadAnswers,
+        },
+      );
+      return ExamResult.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<ExamResult?> fetchMyExamResult(int examId) async {
+    try {
+      final response = await _apiClient.get('/exams/$examId/results');
+      final list = response.data as List<dynamic>;
+      if (list.isEmpty) return null;
+      return ExamResult.fromJson(list.first as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<StudentExamListItem>> fetchMyExams({int? courseId}) async {
+    try {
+      final response = await _apiClient.get(
+        '/exams/my',
+        queryParameters: courseId != null ? {'course_id': courseId} : null,
+      );
+      final list = response.data as List<dynamic>;
+      return list
+          .map((json) => StudentExamListItem.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<void> markContentComplete(int courseId, int contentId) async {
     try {
       await _apiClient.post('/courses/$courseId/content/$contentId/complete');
@@ -125,7 +175,10 @@ class StudentCourseService {
     } else if (e.type == DioExceptionType.connectionError) {
       return Exception('Connection failed. Please check if the server is running and accessible.');
     } else {
-      return Exception('Network error: ${e.message}');
+      final message = (e.message == null || e.message!.trim().isEmpty)
+          ? 'Network error. Please try again.'
+          : 'Network error: ${e.message}';
+      return Exception(message);
     }
   }
 }

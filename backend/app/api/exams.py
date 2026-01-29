@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
 from app.models.user import User, UserRole
-from app.models.course import Course
+from app.models.course import Course, Enrollment
 from app.models.exam import Exam, Question, Result
-from app.schemas.exam import ExamCreate, ExamResponse, ExamSubmit, ResultResponse, QuestionResponse, ResultWithStudentResponse, QuestionCreate, QuestionUpdate, ExamUpdate
+from app.schemas.exam import ExamCreate, ExamResponse, ExamSubmit, ResultResponse, QuestionResponse, ResultWithStudentResponse, QuestionCreate, QuestionUpdate, ExamUpdate, StudentExamListResponse
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
@@ -76,6 +76,57 @@ async def list_exams(course_id: int, db: Session = Depends(get_db)):
         )
         for exam in exams
     ]
+
+
+@router.get("/my", response_model=List[StudentExamListResponse])
+async def list_my_exams(
+    course_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List exams for the current student (optionally filtered by course)."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Only students can access this endpoint")
+
+    enrolled_course_ids = [
+        e.course_id
+        for e in db.query(Enrollment).filter(Enrollment.student_id == current_user.id).all()
+    ]
+
+    if course_id is not None:
+        if course_id not in enrolled_course_ids:
+            return []
+        enrolled_course_ids = [course_id]
+
+    if not enrolled_course_ids:
+        return []
+
+    exams = db.query(Exam).filter(Exam.course_id.in_(enrolled_course_ids)).all()
+    exam_ids = [exam.id for exam in exams]
+    results = db.query(Result).filter(
+        Result.student_id == current_user.id,
+        Result.exam_id.in_(exam_ids) if exam_ids else False,
+    ).all() if exam_ids else []
+    result_by_exam_id = {result.exam_id: result for result in results}
+
+    responses: List[StudentExamListResponse] = []
+    for exam in exams:
+        result = result_by_exam_id.get(exam.id)
+        status = "completed" if result else "available"
+        responses.append(
+            StudentExamListResponse(
+                id=exam.id,
+                course_id=exam.course_id,
+                course_title=exam.course.title if exam.course else "",
+                title=exam.title,
+                description=exam.description,
+                questions_count=len(exam.questions),
+                status=status,
+                score=result.score if result else None,
+            )
+        )
+
+    return responses
 
 
 @router.get("/{exam_id}", response_model=ExamResponse)
