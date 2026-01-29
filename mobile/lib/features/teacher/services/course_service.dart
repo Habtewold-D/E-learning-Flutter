@@ -50,6 +50,31 @@ class CourseService {
     }
   }
 
+  /// Update course title/description
+  Future<Course> updateCourse({
+    required int courseId,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final response = await _apiClient.patch(
+        '/courses/$courseId',
+        data: data,
+      );
+      return Course.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Delete a course
+  Future<void> deleteCourse(int courseId) async {
+    try {
+      await _apiClient.delete('/courses/$courseId');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// Fetch course detail with contents
   Future<Course> fetchCourseDetail(int courseId) async {
     try {
@@ -69,6 +94,47 @@ class CourseService {
       return contents
           .map((json) => CourseContent.fromJson(json as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Upload course content (PDF or video)
+  Future<CourseContent> uploadCourseContent({
+    required int courseId,
+    required String title,
+    required String fileName,
+    String? filePath,
+    List<int>? bytes,
+  }) async {
+    try {
+      final multipart = filePath != null
+          ? await MultipartFile.fromFile(filePath, filename: fileName)
+          : MultipartFile.fromBytes(bytes ?? [], filename: fileName);
+
+      final formData = FormData.fromMap({
+        'title': title,
+        'file': multipart,
+      });
+
+      final response = await _apiClient.postFormData(
+        '/courses/$courseId/content',
+        formData: formData,
+      );
+
+      return CourseContent.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Delete course content
+  Future<void> deleteCourseContent({
+    required int courseId,
+    required int contentId,
+  }) async {
+    try {
+      await _apiClient.delete('/courses/$courseId/content/$contentId');
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -172,6 +238,15 @@ class CourseService {
   Future<void> deleteExamQuestion(int questionId) async {
     try {
       await _apiClient.delete('/exams/questions/$questionId');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Delete an exam
+  Future<void> deleteExam(int examId) async {
+    try {
+      await _apiClient.delete('/exams/$examId');
     } on DioException catch (e) {
       throw _handleError(e);
     }

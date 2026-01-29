@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:file_picker/file_picker.dart';
+import '../../../core/api/api_client.dart';
+import '../services/course_service.dart';
 
 class UploadContentScreen extends StatefulWidget {
   final String courseId;
@@ -18,7 +21,10 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
   final _titleController = TextEditingController();
   String? _selectedFileType;
   String? _selectedFileName;
+  String? _selectedFilePath;
+  List<int>? _selectedFileBytes;
   bool _isUploading = false;
+  late final CourseService _courseService;
 
   @override
   void dispose() {
@@ -26,38 +32,32 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _courseService = CourseService(ApiClient());
+  }
+
   Future<void> _pickFile() async {
-    // Mock file picker
-    final fileType = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select File Type'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-              title: const Text('PDF Document'),
-              onTap: () => Navigator.pop(context, 'pdf'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.video_library, color: Colors.blue),
-              title: const Text('Video File'),
-              onTap: () => Navigator.pop(context, 'video'),
-            ),
-          ],
-        ),
-      ),
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'mp4', 'mov', 'avi', 'mkv', 'webm'],
+      withData: true,
     );
 
-    if (fileType != null) {
-      setState(() {
-        _selectedFileType = fileType;
-        _selectedFileName = fileType == 'pdf'
-            ? 'example_document.pdf'
-            : 'example_video.mp4';
-      });
-    }
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.single;
+    final fileName = file.name;
+    final extension = file.extension?.toLowerCase() ?? '';
+    final fileType = extension == 'pdf' ? 'pdf' : 'video';
+
+    setState(() {
+      _selectedFileType = fileType;
+      _selectedFileName = fileName;
+      _selectedFilePath = file.path;
+      _selectedFileBytes = file.bytes;
+    });
   }
 
   Future<void> _handleUpload() async {
@@ -79,22 +79,45 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
       _isUploading = true;
     });
 
-    // Simulate upload
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final courseId = int.tryParse(widget.courseId);
+      if (courseId == null) {
+        throw Exception('Invalid course id');
+      }
+      if (_selectedFileName == null) {
+        throw Exception('File name not found');
+      }
 
-    if (mounted) {
-      setState(() {
-        _isUploading = false;
-      });
+      await _courseService.uploadCourseContent(
+        courseId: courseId,
+        title: _titleController.text.trim(),
+        fileName: _selectedFileName!,
+        filePath: _selectedFilePath,
+        bytes: _selectedFileBytes,
+      );
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Content uploaded successfully!'),
           backgroundColor: Colors.green,
         ),
       );
-
-      context.pop();
+      context.pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
   }
 

@@ -15,6 +15,7 @@ from app.schemas.course import (
     EnrolledCourseResponse,
     CourseProgressResponse,
     EnrollmentResponse,
+    CourseUpdate,
 )
 from app.api.dependencies import get_current_user
 from app.services.file_service import save_uploaded_file
@@ -52,8 +53,6 @@ async def list_courses(db: Session = Depends(get_db)):
     """List all courses."""
     courses = db.query(Course).all()
     return [CourseResponse.model_validate(course) for course in courses]
-
-
 @router.get("/browse", response_model=List[CourseBrowseResponse])
 async def browse_courses(
     current_user: User = Depends(get_current_user),
@@ -109,6 +108,53 @@ async def get_course(course_id: int, db: Session = Depends(get_db)):
         teacher_id=course.teacher_id,
         contents=[ContentResponse.model_validate(content) for content in course.contents]
     )
+
+
+@router.patch("/{course_id}", response_model=CourseResponse)
+async def update_course(
+    course_id: int,
+    course_data: CourseUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update course title/description (teacher only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can update courses")
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own courses")
+
+    update_data = course_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(course, key, value)
+
+    db.commit()
+    db.refresh(course)
+    return CourseResponse.model_validate(course)
+
+
+@router.delete("/{course_id}")
+async def delete_course(
+    course_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a course (teacher only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can delete courses")
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete your own courses")
+
+    db.delete(course)
+    db.commit()
+    return {"detail": "Course deleted"}
 
 
 @router.post("/{course_id}/content", response_model=ContentResponse)
@@ -293,6 +339,35 @@ async def mark_content_complete(
     db.add(ContentProgress(content_id=content_id, student_id=current_user.id))
     db.commit()
     return {"message": "Marked complete"}
+
+
+@router.delete("/{course_id}/content/{content_id}")
+async def delete_course_content(
+    course_id: int,
+    content_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a course content item (teacher only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can delete content")
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only course teacher can delete content")
+
+    content = db.query(CourseContent).filter(
+        CourseContent.id == content_id,
+        CourseContent.course_id == course_id
+    ).first()
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+
+    db.delete(content)
+    db.commit()
+    return {"detail": "Content deleted"}
 
 
 @router.post("/{course_id}/progress/{content_id}/complete")

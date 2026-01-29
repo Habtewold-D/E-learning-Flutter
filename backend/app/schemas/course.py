@@ -8,6 +8,11 @@ class CourseCreate(BaseModel):
     description: Optional[str] = None
 
 
+class CourseUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
 class CourseResponse(BaseModel):
     id: int
     title: str

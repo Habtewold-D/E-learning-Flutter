@@ -70,13 +70,6 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       appBar: AppBar(
         title: const Text('My Courses'),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => context.push('/teacher/create-course'),
-            tooltip: 'Create Course',
-          ),
-        ],
       ),
       drawer: const TeacherDrawer(),
       body: Column(
@@ -240,10 +233,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                     ],
                     onSelected: (value) {
                       if (value == 'edit') {
-                        // Edit course
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Edit course (coming soon)')),
-                        );
+                        _showEditDialog(course);
                       } else if (value == 'delete') {
                         // Delete course
                         _showDeleteDialog(course);
@@ -320,9 +310,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${course.title} deleted (mock)')),
-              );
+              _deleteCourse(course);
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete'),
@@ -330,6 +318,88 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
         ],
       ),
     );
+  }
+
+  void _showEditDialog(Course course) {
+    final titleController = TextEditingController(text: course.title);
+    final descriptionController = TextEditingController(text: course.description ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Course'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(labelText: 'Description'),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final title = titleController.text.trim();
+              final description = descriptionController.text.trim();
+              try {
+                await _courseService.updateCourse(
+                  courseId: course.id,
+                  data: {
+                    'title': title.isEmpty ? course.title : title,
+                    'description': description.isEmpty ? null : description,
+                  },
+                );
+                if (!mounted) return;
+                Navigator.pop(context);
+                await _fetchCourses();
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString()),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteCourse(Course course) async {
+    try {
+      await _courseService.deleteCourse(course.id);
+      await _fetchCourses();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Course deleted'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 

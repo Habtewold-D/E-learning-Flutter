@@ -80,14 +80,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           title: Text(_course?.title ?? 'Course'),
           elevation: 0,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit course (coming soon)')),
-                );
-              },
-            ),
             PopupMenuButton(
               itemBuilder: (context) => [
                 const PopupMenuItem(
@@ -474,9 +466,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           ],
           onSelected: (value) {
             if (value == 'delete') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${content.title} deleted (mock)')),
-              );
+              _confirmDeleteContent(content);
             }
           },
         ),
@@ -518,16 +508,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             PopupMenuButton(
               itemBuilder: (context) => [
                 const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 20),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [
@@ -539,12 +519,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 ),
               ],
               onSelected: (value) {
-                if (value == 'edit') {
-                  context.push('/teacher/courses/$courseId/create-exam?examId=${exam.id}');
-                } else if (value == 'delete') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${exam.title} deleted (mock)')),
-                  );
+                if (value == 'delete') {
+                  _confirmDeleteExam(exam);
                 }
               },
             ),
@@ -572,6 +548,93 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('$courseTitle deleted (mock)')),
               );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteContent(CourseContent content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Content'),
+        content: Text('Delete "${content.title}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _courseService.deleteCourseContent(
+                  courseId: int.parse(widget.courseId),
+                  contentId: content.id,
+                );
+                await _loadCourseData();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Content deleted'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString()),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteExam(ExamSummary exam) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Exam'),
+        content: Text('Delete "${exam.title}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _courseService.deleteExam(exam.id);
+                await _loadCourseData();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Exam deleted'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString()),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete'),

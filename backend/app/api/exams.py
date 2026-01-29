@@ -217,6 +217,28 @@ async def delete_question(
     return {"detail": "Question deleted"}
 
 
+@router.delete("/{exam_id}")
+async def delete_exam(
+    exam_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete an exam (teachers only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can delete exams")
+
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    if exam.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete your own exams")
+
+    db.delete(exam)
+    db.commit()
+    return {"detail": "Exam deleted"}
+
+
 @router.post("/{exam_id}/submit", response_model=ResultResponse)
 async def submit_exam(
     exam_id: int,
