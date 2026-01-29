@@ -5,18 +5,203 @@ import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../auth/providers/auth_provider.dart';
 
-class StudentProfileScreen extends ConsumerWidget {
+class StudentProfileScreen extends ConsumerStatefulWidget {
   const StudentProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentProfileScreen> createState() =>
+      _StudentProfileScreenState();
+}
+
+class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
+  Future<void> _showEditDialog() async {
+    final user = ref.read(authProvider).user;
+    final nameController = TextEditingController(text: user?.name ?? '');
+    final emailController = TextEditingController(text: user?.email ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    final scaffoldContext = context;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Profile'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Full name'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Name is required';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Email is required';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() != true) {
+                return;
+              }
+
+              final updated = await ref.read(authProvider.notifier).updateProfile(
+                    name: nameController.text.trim(),
+                    email: emailController.text.trim(),
+                  );
+
+              if (!mounted) {
+                return;
+              }
+
+              if (updated != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Profile updated')),
+                );
+                Navigator.of(context).pop();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(ref.read(authProvider).error ?? 'Failed to update profile')),
+                );
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      nameController.dispose();
+      emailController.dispose();
+    });
+  }
+
+  Future<void> _showChangePasswordDialog() async {
+    final scaffoldContext = context;
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Password'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: currentPasswordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Current password'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Enter your current password';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: newPasswordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'New password'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Enter a new password';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: confirmPasswordController,
+                obscureText: true,
+                decoration:
+                    const InputDecoration(labelText: 'Re-enter password'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Re-enter the password';
+                  }
+                  if (value != newPasswordController.text) {
+                    return 'Passwords do not match';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() != true) {
+                return;
+              }
+
+              final success = await ref.read(authProvider.notifier).changePassword(
+                    currentPassword: currentPasswordController.text,
+                    newPassword: newPasswordController.text,
+                    confirmPassword: confirmPasswordController.text,
+                  );
+
+              if (!mounted) {
+                return;
+              }
+
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Password updated')),
+                );
+                Navigator.of(context).pop();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(ref.read(authProvider).error ?? 'Failed to update password')),
+                );
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      currentPasswordController.dispose();
+      newPasswordController.dispose();
+      confirmPasswordController.dispose();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
-
-    // Mock stats
-    final enrolledCourses = 3;
-    final completedExams = 5;
-    final averageScore = 82.5;
 
     return Scaffold(
       appBar: AppBar(
@@ -25,11 +210,7 @@ class StudentProfileScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit Profile coming soon!')),
-              );
-            },
+            onPressed: _showEditDialog,
             tooltip: 'Edit Profile',
           ),
         ],
@@ -38,7 +219,6 @@ class StudentProfileScreen extends ConsumerWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Profile Header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24.0),
@@ -56,7 +236,9 @@ class StudentProfileScreen extends ConsumerWidget {
                     radius: 50,
                     backgroundColor: Colors.white,
                     child: Text(
-                      user?.name?.substring(0, 1).toUpperCase() ?? 'S',
+                        (user?.name ?? '').isNotEmpty
+                          ? user!.name.substring(0, 1).toUpperCase()
+                          : 'S',
                       style: TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.bold,
@@ -76,154 +258,64 @@ class StudentProfileScreen extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     user?.email ?? '',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Student',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-
-            // Stats Section
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.book,
-                      label: 'Courses',
-                      value: enrolledCourses.toString(),
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.quiz,
-                      label: 'Exams',
-                      value: completedExams.toString(),
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      icon: Icons.star,
-                      label: 'Avg Score',
-                      value: averageScore.toStringAsFixed(1),
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Profile Information
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16),
               child: Card(
                 elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      _buildProfileInfoRow(
-                        context,
-                        icon: Icons.person_outline,
-                        label: 'Full Name',
-                        value: user?.name ?? 'N/A',
-                      ),
-                      const Divider(),
-                      _buildProfileInfoRow(
-                        context,
-                        icon: Icons.email_outlined,
-                        label: 'Email',
-                        value: user?.email ?? 'N/A',
-                      ),
-                      const Divider(),
-                      _buildProfileInfoRow(
-                        context,
-                        icon: Icons.badge_outlined,
-                        label: 'Role',
-                        value: user?.role ?? 'N/A',
-                      ),
-                      const Divider(),
-                      _buildProfileInfoRow(
-                        context,
-                        icon: Icons.check_circle_outline,
-                        label: 'Status',
-                        value: user?.isActive == true ? 'Active' : 'Inactive',
-                      ),
-                    ],
-                  ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.person_outline),
+                      title: const Text('Full Name'),
+                      subtitle: Text(user?.name ?? 'N/A'),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.email_outlined),
+                      title: const Text('Email'),
+                      subtitle: Text(user?.email ?? 'N/A'),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.lock_outline),
+                      title: const Text('Change password'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _showChangePasswordDialog,
+                    ),
+                  ],
                 ),
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // Actions
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Settings coming soon!')),
-                        );
-                      },
-                      icon: const Icon(Icons.settings),
-                      label: const Text('Settings'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    await ref.read(authProvider.notifier).logout();
+                    if (context.mounted) {
+                      context.go('/login');
+                    }
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Logout'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        await ref.read(authProvider.notifier).logout();
-                        if (context.mounted) {
-                          context.go('/login');
-                        }
-                      },
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Logout'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -233,85 +325,8 @@ class StudentProfileScreen extends ConsumerWidget {
       bottomNavigationBar: const StudentBottomNav(currentIndex: 3),
     );
   }
-
-  Widget _buildStatCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileInfoRow(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Theme.of(context).colorScheme.secondary, size: 24),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
+ 
 
 
 

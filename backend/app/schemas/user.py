@@ -29,7 +29,12 @@ class UserResponse(BaseModel):
 class UserUpdate(BaseModel):
     name: str | None = None
     email: EmailStr | None = None
-    password: str | None = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
 
 
 class Token(BaseModel):

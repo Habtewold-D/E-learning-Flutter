@@ -25,6 +25,7 @@ class AppConstants {
   static const String authRegister = '/auth/register';
   static const String authLogin = '/auth/login';
   static const String authMe = '/auth/me';
+  static const String authChangePassword = '/auth/change-password';
   
   static const String courses = '/courses';
   static const String courseContent = '/courses/{course_id}/content';

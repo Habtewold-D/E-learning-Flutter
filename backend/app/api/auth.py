@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, Token, UserResponse, UserUpdate
+from app.schemas.user import UserCreate, UserLogin, Token, UserResponse, UserUpdate, PasswordChange
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
@@ -65,16 +65,43 @@ async def update_current_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update current user profile (name/email/password)."""
+    """Update current user profile (name/email)."""
     if updates.name is not None:
         current_user.name = updates.name
     if updates.email is not None:
         current_user.email = updates.email
-    if updates.password is not None:
-        current_user.password = get_password_hash(updates.password)
 
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
     return UserResponse.model_validate(current_user)
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change current user password. Requires current password verification."""
+    # Verify current password
+    try:
+        is_correct = verify_password(payload.current_password, current_user.password)
+    except Exception:
+        is_correct = False
+
+    # Debug log for verification result (do not log raw passwords)
+    print(f"change-password: user={current_user.id} verify_current_password={is_correct}")
+
+    if not is_correct:
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    current_user.password = get_password_hash(payload.new_password)
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return {"detail": "Password updated"}
 

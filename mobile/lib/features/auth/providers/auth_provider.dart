@@ -252,6 +252,88 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await SecureStorage.clearAll();
     state = AuthState();
   }
+
+  // Update profile (name/email only)
+  Future<User?> updateProfile({
+    String? name,
+    String? email,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final response = await _apiClient.patch(
+        AppConstants.authMe,
+        data: {
+          if (name != null) 'name': name,
+          if (email != null) 'email': email,
+        },
+      );
+
+      final updatedUser = User.fromJson(response.data as Map<String, dynamic>);
+      await SecureStorage.saveUserData(json.encode(updatedUser.toJson()));
+
+      state = state.copyWith(
+        user: updatedUser,
+        isLoading: false,
+        error: null,
+      );
+
+      return updatedUser;
+    } catch (e) {
+      String errorMessage = 'Update failed. Please try again.';
+      if (e is DioException && e.response != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data.containsKey('detail')) {
+          errorMessage = data['detail'].toString();
+        } else if (data is String) {
+          errorMessage = data;
+        }
+      } else {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+
+      state = state.copyWith(isLoading: false, error: errorMessage);
+      return null;
+    }
+  }
+
+  // Change password
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      await _apiClient.post(
+        AppConstants.authChangePassword,
+        data: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+          'confirm_password': confirmPassword,
+        },
+      );
+
+      state = state.copyWith(isLoading: false, error: null);
+      return true;
+    } catch (e) {
+      String errorMessage = 'Password update failed. Please try again.';
+      if (e is DioException && e.response != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic> && data.containsKey('detail')) {
+          errorMessage = data['detail'].toString();
+        } else if (data is String) {
+          errorMessage = data;
+        }
+      } else {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+
+      state = state.copyWith(isLoading: false, error: errorMessage);
+      return false;
+    }
+  }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
