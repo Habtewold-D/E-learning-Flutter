@@ -142,23 +142,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Icon(Icons.person, color: Colors.white70, size: 18),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Teacher: ${_course?.teacherId ?? '—'}',
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                      const SizedBox(width: 16),
-                      Icon(Icons.people, color: Colors.white70, size: 18),
-                      const SizedBox(width: 4),
-                      Text(
-                        '— students',
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -279,6 +262,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     );
   }
 
+  Future<void> _refreshProgress(int courseId) async {
+    try {
+      final progress = await _courseService.fetchCourseProgress(courseId);
+      if (!mounted) return;
+      setState(() {
+        _progress = progress;
+      });
+    } catch (_) {
+      // Ignore progress refresh errors silently.
+    }
+  }
+
   Widget _buildContentItem(CourseContent item) {
     final isCompleted = _progress?.completedContentIds.contains(item.id) ?? false;
     final isVideo = item.type == 'video';
@@ -310,13 +305,26 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           trailing: isCompleted
               ? Icon(Icons.check_circle, color: Colors.green, size: 24)
               : const Icon(Icons.arrow_forward_ios, size: 16),
-          onTap: () {
-            _courseService.markContentComplete(int.parse(widget.courseId), item.id);
-            if (isVideo) {
-              context.push('/student/content/${item.id}?type=video');
-            } else {
-              context.push('/student/content/${item.id}?type=pdf');
+          onTap: () async {
+            final courseId = int.tryParse(widget.courseId);
+            if (courseId == null) return;
+
+            if (!isCompleted) {
+              await _courseService.markContentComplete(courseId, item.id);
+              await _refreshProgress(courseId);
             }
+
+            if (!mounted) return;
+            await context.push(
+              '/student/content/${item.id}',
+              extra: {
+                'title': item.title,
+                'type': item.type,
+                'url': item.url,
+              },
+            );
+
+            await _refreshProgress(courseId);
           },
         ),
       ),

@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:video_player/video_player.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import '../../../core/utils/constants.dart';
 import '../../../core/widgets/student_drawer.dart';
 
 class ContentViewerScreen extends StatefulWidget {
   final String contentId;
   final String type; // 'video' or 'pdf'
+  final String title;
+  final String url;
   const ContentViewerScreen({
     super.key,
     required this.contentId,
+    required this.title,
     required this.type,
+    required this.url,
   });
 
   @override
@@ -17,14 +23,39 @@ class ContentViewerScreen extends StatefulWidget {
 
 class _ContentViewerScreenState extends State<ContentViewerScreen> {
   bool _isCompleted = false;
+  VideoPlayerController? _videoController;
+  Future<void>? _initializeVideo;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isVideo) {
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(_resolveUrl(widget.url)));
+      _initializeVideo = _videoController!.initialize();
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  bool get _isVideo => widget.type.toLowerCase() == 'video';
+
+  String _resolveUrl(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    final base = AppConstants.baseUrl.replaceFirst(RegExp(r'/api/?$'), '');
+    return '$base/uploads/$url';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isVideo = widget.type == 'video';
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(isVideo ? 'Video Content' : 'PDF Document'),
+        title: Text(widget.title),
         actions: [
           IconButton(
             icon: Icon(_isCompleted ? Icons.check_circle : Icons.check_circle_outline),
@@ -43,108 +74,52 @@ class _ContentViewerScreenState extends State<ContentViewerScreen> {
         ],
       ),
       drawer: const StudentDrawer(),
-      body: isVideo ? _buildVideoViewer() : _buildPdfViewer(),
+      body: _isVideo ? _buildVideoViewer() : _buildPdfViewer(),
     );
   }
 
   Widget _buildVideoViewer() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.play_circle_outline,
-            size: 100,
-            color: Theme.of(context).colorScheme.secondary,
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Video Player',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+    if (_videoController == null) {
+      return const Center(child: Text('Video not available'));
+    }
+
+    return FutureBuilder<void>(
+      future: _initializeVideo,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return Column(
+          children: [
+            AspectRatio(
+              aspectRatio: _videoController!.value.aspectRatio,
+              child: VideoPlayer(_videoController!),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Content ID: ${widget.contentId}',
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Video player integration coming soon!')),
-              );
-            },
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Play Video'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            const SizedBox(height: 12),
+            IconButton(
+              iconSize: 48,
+              icon: Icon(
+                _videoController!.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
+              ),
+              onPressed: () {
+                setState(() {
+                  if (_videoController!.value.isPlaying) {
+                    _videoController!.pause();
+                  } else {
+                    _videoController!.play();
+                  }
+                });
+              },
             ),
-          ),
-          const SizedBox(height: 16),
-          const Padding(
-            padding: EdgeInsets.all(24.0),
-            child: Text(
-              'This screen will integrate with video_player package to play course videos.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildPdfViewer() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.picture_as_pdf,
-            size: 100,
-            color: Theme.of(context).colorScheme.secondary,
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'PDF Viewer',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Content ID: ${widget.contentId}',
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('PDF viewer integration coming soon!')),
-              );
-            },
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('Open PDF'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Padding(
-            padding: EdgeInsets.all(24.0),
-            child: Text(
-              'This screen will integrate with syncfusion_flutter_pdfviewer to display PDF documents.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-        ],
-      ),
-    );
+    final url = _resolveUrl(widget.url);
+    return SfPdfViewer.network(url);
   }
 }
 

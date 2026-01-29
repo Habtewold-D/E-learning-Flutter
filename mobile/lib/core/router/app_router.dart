@@ -246,8 +246,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'student-content-viewer',
         builder: (context, state) {
           final contentId = state.pathParameters['contentId']!;
-          final type = state.uri.queryParameters['type'] ?? 'video';
-          return ContentViewerScreen(contentId: contentId, type: type);
+          final extra = state.extra as Map<String, dynamic>?;
+          final type = (extra?['type'] as String?) ?? state.uri.queryParameters['type'] ?? 'video';
+          final title = (extra?['title'] as String?) ?? 'Content $contentId';
+          final url = (extra?['url'] as String?) ?? '';
+          return ContentViewerScreen(
+            contentId: contentId,
+            title: title,
+            type: type,
+            url: url,
+          );
         },
       ),
       GoRoute(
