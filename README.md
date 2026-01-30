@@ -1,6 +1,6 @@
 # E-Learning Platform MVP
 
-A comprehensive e-learning platform built with Flutter (mobile) and FastAPI (backend), featuring live classes, course management, exams, and RAG-powered PDF Q&A.
+A comprehensive e-learning platform built with Flutter (mobile) and FastAPI (backend), featuring live classes, course management, and exams.
 
 ## 🎯 Project Overview
 
@@ -8,7 +8,6 @@ This is an MVP (Minimum Viable Product) designed to demonstrate:
 - ✅ Live teaching capabilities
 - ✅ Course upload (video + PDF)
 - ✅ Exam creation and auto-grading
-- ✅ RAG-based PDF question answering
 - ✅ Clean architecture with modern tech stack
 
 ## 🏗️ Architecture
@@ -22,16 +21,11 @@ FastAPI Backend
  ├── Auth Service (JWT)
  ├── Course Service
  ├── Exam Service
- ├── RAG Service
  ├── Live Class Service
  |
 PostgreSQL Database
  |
 File Storage (Local/Cloud)
- |
-FAISS Vector DB (Embeddings)
- |
-OpenAI API (LLM)
 ```
 
 ## 🛠️ Technology Stack
@@ -45,7 +39,6 @@ OpenAI API (LLM)
 ### Backend (FastAPI)
 - **Core**: FastAPI, SQLAlchemy, Pydantic, Python-JOSE, Passlib
 - **Database**: PostgreSQL
-- **RAG**: LangChain, sentence-transformers, FAISS, PyPDF, OpenAI
 - **Storage**: Local filesystem (can be upgraded to S3/Cloudinary)
 
 ## 📁 Project Structure
@@ -58,7 +51,6 @@ biruk_challenge/
 │   │   │   ├── auth.py
 │   │   │   ├── courses.py
 │   │   │   ├── exams.py
-│   │   │   ├── rag.py
 │   │   │   └── live.py
 │   │   ├── core/
 │   │   │   ├── config.py
@@ -67,7 +59,6 @@ biruk_challenge/
 │   │   ├── models/
 │   │   ├── schemas/
 │   │   ├── services/
-│   │   │   ├── rag_service.py
 │   │   │   └── file_service.py
 │   │   └── main.py
 │   ├── requirements.txt
@@ -80,7 +71,6 @@ biruk_challenge/
 │   │   │   ├── auth/
 │   │   │   ├── courses/
 │   │   │   ├── exams/
-│   │   │   ├── rag/
 │   │   │   └── live/
 │   │   └── providers/
 │   ├── pubspec.yaml
@@ -113,10 +103,9 @@ flutter run
 - **Day 1**: Project setup + Authentication
 - **Day 2**: Course management + File uploads
 - **Day 3**: Exam system + Auto-grading
-- **Day 4**: RAG implementation
-- **Day 5**: Live class integration
-- **Day 6**: Integration + UI polish
-- **Day 7**: Testing + Documentation
+- **Day 4**: Live class integration
+- **Day 5**: Integration + UI polish
+- **Day 6**: Testing + Documentation
 
 ## 🔑 Environment Variables
 
@@ -125,7 +114,6 @@ flutter run
 DATABASE_URL=postgresql://user:password@localhost/dbname
 SECRET_KEY=your-secret-key
 ALGORITHM=HS256
-OPENAI_API_KEY=your-openai-key
 UPLOAD_DIR=./uploads
 ```
 
@@ -143,7 +131,6 @@ UPLOAD_DIR=./uploads
 - Login/Register
 - Browse and enroll in courses
 - Watch videos / Read PDFs
-- Ask questions from PDFs (RAG)
 - Take exams
 - View grades
 
@@ -159,16 +146,6 @@ UPLOAD_DIR=./uploads
 Once the server is running, visit:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
-
-## 🤝 Contributing
-
-This is an MVP project. For production use, consider:
-- Adding comprehensive tests
-- Implementing caching
-- Using cloud storage (S3/Cloudinary)
-- Adding real-time notifications
-- Implementing payment gateway
-- Adding analytics dashboard
 
 ## 📄 License
 

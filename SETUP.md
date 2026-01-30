@@ -44,7 +44,7 @@ flutter pub get
 ```
 
 2. **Update API base URL:**
-Edit `lib/core/api/api_client.dart` and change the `baseUrl` to match your backend:
+Edit `lib/core/utils/constants.dart` and change the `baseUrl` to match your backend:
 - For Android Emulator: `http://10.0.2.2:8000/api`
 - For iOS Simulator: `http://localhost:8000/api`
 - For Physical Device: `http://YOUR_IP:8000/api`

@@ -88,11 +88,7 @@ mobile/
    - Take exam
    - Results view
 
-4. **RAG Feature**
-   - Chat interface
-   - Question/Answer UI
-
-5. **Live Classes Feature**
+4. **Live Classes Feature**
    - Room creation
    - Jitsi Meet integration
 
@@ -124,8 +120,7 @@ The app currently shows placeholder screens. Implement features step by step:
 1. Start with Authentication
 2. Then Courses
 3. Then Exams
-4. Then RAG
-5. Finally Live Classes
+4. Finally Live Classes
 
 ---
 
