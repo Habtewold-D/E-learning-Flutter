@@ -14,7 +14,6 @@ import '../../features/student/screens/exams_list_screen.dart';
 import '../../features/student/screens/take_exam_screen.dart';
 import '../../features/student/screens/exam_results_screen.dart';
 import '../../features/student/screens/review_answers_screen.dart';
-import '../../features/student/screens/rag_chat_screen.dart';
 import '../../features/student/screens/live_classes_screen.dart';
 import '../../features/student/screens/live_class_join_screen.dart';
 import '../../features/student/screens/student_profile_screen.dart';
@@ -303,14 +302,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: '/student/rag',
-        name: 'student-rag-chat',
-        builder: (context, state) {
-          final courseContentId = state.uri.queryParameters['courseContentId'];
-          return RAGChatScreen(courseContentId: courseContentId);
-        },
-      ),
-      GoRoute(
         path: '/student/live',
         name: 'student-live-classes',
         builder: (context, state) => const StudentLiveClassesScreen(),
@@ -369,19 +360,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           return Scaffold(
             appBar: AppBar(title: Text('Exam $examId')),
             body: Center(child: Text('Take Exam - Coming Soon')),
-          );
-        },
-      ),
-
-      // RAG Route (will be implemented later)
-      GoRoute(
-        path: '/rag/:contentId',
-        name: 'rag',
-        builder: (context, state) {
-          final contentId = state.pathParameters['contentId']!;
-          return Scaffold(
-            appBar: AppBar(title: const Text('Ask Questions')),
-            body: Center(child: Text('RAG Chat - Content $contentId - Coming Soon')),
           );
         },
       ),

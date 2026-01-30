@@ -5,6 +5,7 @@ import '../../../core/widgets/teacher_drawer.dart';
 import '../../../core/api/api_client.dart';
 import '../../courses/models/course_model.dart';
 import '../../courses/models/course_content_model.dart';
+import '../../courses/models/student_summary_model.dart';
 import '../../exams/models/exam_model.dart';
 import 'content_viewer_screen.dart';
 import '../services/course_service.dart';
@@ -26,6 +27,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Course? _course;
   List<CourseContent> _contents = [];
   List<ExamSummary> _exams = [];
+  List<StudentSummary> _students = [];
   bool _isLoading = true;
   String? _error;
 
@@ -56,12 +58,14 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         _courseService.fetchCourseDetail(courseId),
         _courseService.fetchCourseContent(courseId),
         _courseService.fetchExamsByCourse(courseId),
+        _courseService.fetchCourseStudents(courseId),
       ]);
 
       setState(() {
         _course = results[0] as Course;
         _contents = results[1] as List<CourseContent>;
         _exams = results[2] as List<ExamSummary>;
+        _students = results[3] as List<StudentSummary>;
         _isLoading = false;
       });
     } catch (e) {
@@ -183,10 +187,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     const SizedBox(height: 16),
                     _buildInfoRow('Description', _course?.description ?? ''),
                     const Divider(),
-                    _buildInfoRow('Students Enrolled', '—'),
+                    _buildInfoRow('Students Enrolled', '${_students.length}'),
                     _buildInfoRow('Content Items', '${_contents.length}'),
                     _buildInfoRow('Exams', '${_exams.length}'),
-                    _buildInfoRow('Created', _course?.createdAt?.toLocal().toString().split(' ').first ?? '—'),
                   ],
                 ),
               ),
@@ -208,7 +211,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     context,
                     icon: Icons.people,
                     title: 'Students',
-                    value: '—',
+                    value: '${_students.length}',
                     color: Colors.blue,
                   ),
                 ),
@@ -234,8 +237,58 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+            Text(
+              'Enrolled Students',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            if (_students.isEmpty)
+              _buildEmptyStudentsCard()
+            else
+              ..._students.map(_buildStudentCard),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyStudentsCard() {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Icon(Icons.people_outline, color: Colors.grey[400]),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'No students enrolled yet',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentCard(StudentSummary student) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          child: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+        ),
+        title: Text(student.name.isNotEmpty ? student.name : 'Student ${student.id}'),
+        subtitle: Text(student.email),
       ),
     );
   }

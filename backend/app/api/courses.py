@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
@@ -16,15 +16,14 @@ from app.schemas.course import (
     CourseProgressResponse,
     EnrollmentResponse,
     CourseUpdate,
+    StudentSummary,
 )
 from app.api.dependencies import get_current_user
 from app.services.file_service import save_uploaded_file
-from app.services.rag_service import RAGService
 import os
 from app.core.config import settings
 
 router = APIRouter()
-rag_service = RAGService()
 
 
 @router.post("/", response_model=CourseResponse)
@@ -110,6 +109,34 @@ async def get_course(course_id: int, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/{course_id}/students", response_model=List[StudentSummary])
+async def list_course_students(
+    course_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List enrolled students for a course (teacher only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can access this endpoint")
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only view your own course")
+
+    enrollments = db.query(Enrollment).filter(Enrollment.course_id == course_id).all()
+    return [
+        StudentSummary(
+            id=e.student.id,
+            name=e.student.name,
+            email=e.student.email,
+        )
+        for e in enrollments
+        if e.student is not None
+    ]
+
+
 @router.patch("/{course_id}", response_model=CourseResponse)
 async def update_course(
     course_id: int,
@@ -162,11 +189,10 @@ async def upload_content(
     course_id: int,
     title: str = Form(...),
     file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Upload course content (video or PDF). PDFs are automatically processed for RAG in background."""
+    """Upload course content (video or PDF)."""
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -203,18 +229,6 @@ async def upload_content(
     db.add(new_content)
     db.commit()
     db.refresh(new_content)
-    
-    # Auto-process PDF for RAG in background (non-blocking)
-    if content_type == ContentType.PDF:
-        async def process_pdf_background():
-            try:
-                await rag_service.process_pdf(file_url, new_content.id)
-                print(f"Successfully processed PDF for RAG: content_id={new_content.id}")
-            except Exception as e:
-                print(f"Error processing PDF for RAG (content_id={new_content.id}): {e}")
-                # Don't fail the upload if RAG processing fails
-        
-        background_tasks.add_task(process_pdf_background)
     
     return ContentResponse.model_validate(new_content)
 

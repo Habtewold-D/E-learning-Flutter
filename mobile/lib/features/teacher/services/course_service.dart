@@ -3,6 +3,7 @@ import '../../../core/api/api_client.dart';
 import '../../courses/models/course_model.dart';
 import '../../courses/models/course_browse_model.dart';
 import '../../courses/models/course_content_model.dart';
+import '../../courses/models/student_summary_model.dart';
 import '../../exams/models/exam_model.dart';
 
 class CourseService {
@@ -94,6 +95,19 @@ class CourseService {
     try {
       final response = await _apiClient.get('/courses/$courseId');
       return Course.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Fetch enrolled students for a course (teacher)
+  Future<List<StudentSummary>> fetchCourseStudents(int courseId) async {
+    try {
+      final response = await _apiClient.get('/courses/$courseId/students');
+      final list = response.data as List<dynamic>;
+      return list
+          .map((json) => StudentSummary.fromJson(json as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw _handleError(e);
     }

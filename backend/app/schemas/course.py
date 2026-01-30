@@ -77,3 +77,9 @@ class CourseProgressResponse(BaseModel):
     progress: float
     completed_content_ids: List[int]
 
+
+class StudentSummary(BaseModel):
+    id: int
+    name: str
+    email: str
+

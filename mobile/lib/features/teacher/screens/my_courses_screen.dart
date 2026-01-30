@@ -16,6 +16,9 @@ class MyCoursesScreen extends StatefulWidget {
 class _MyCoursesScreenState extends State<MyCoursesScreen> {
   late final CourseService _courseService;
   List<Course> _courses = [];
+  Map<int, int> _studentsByCourse = {};
+  Map<int, int> _contentByCourse = {};
+  Map<int, int> _examsByCourse = {};
   bool _isLoading = true;
   String? _error;
 
@@ -44,8 +47,31 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
     try {
       final courses = await _courseService.fetchMyCourses();
+      final courseIds = courses.map((c) => c.id).toSet();
+
+      final browseCourses = await _courseService.fetchCoursesWithEnrollment();
+      final studentsByCourse = <int, int>{};
+      final contentByCourse = <int, int>{};
+      for (final course in browseCourses) {
+        if (courseIds.contains(course.id)) {
+          studentsByCourse[course.id] = course.studentsCount;
+          contentByCourse[course.id] = course.contentCount;
+        }
+      }
+
+      final examLists = await Future.wait(
+        courses.map((course) => _courseService.fetchExamsByCourse(course.id)),
+      );
+      final examsByCourse = <int, int>{};
+      for (var i = 0; i < courses.length; i++) {
+        examsByCourse[courses[i].id] = examLists[i].length;
+      }
+
       setState(() {
         _courses = courses;
+        _studentsByCourse = studentsByCourse;
+        _contentByCourse = contentByCourse;
+        _examsByCourse = examsByCourse;
         _isLoading = false;
       });
     } catch (e) {
@@ -181,9 +207,9 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   }
 
   Widget _buildCourseCard(Course course) {
-    final createdAtText = course.createdAt != null
-        ? course.createdAt!.toLocal().toString().split(' ').first
-        : '—';
+    final studentsCount = _studentsByCourse[course.id] ?? 0;
+    final contentCount = _contentByCourse[course.id] ?? 0;
+    final examsCount = _examsByCourse[course.id] ?? 0;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -257,17 +283,17 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                 children: [
                   _buildInfoChip(
                     icon: Icons.people,
-                    label: '0 students',
+                    label: '$studentsCount students',
                   ),
                   const SizedBox(width: 12),
                   _buildInfoChip(
                     icon: Icons.description,
-                    label: '0 content',
+                    label: '$contentCount content',
                   ),
                   const SizedBox(width: 12),
                   _buildInfoChip(
                     icon: Icons.quiz,
-                    label: '0 exams',
+                    label: '$examsCount exams',
                   ),
                 ],
               ),

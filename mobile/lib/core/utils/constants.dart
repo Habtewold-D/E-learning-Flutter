@@ -15,7 +15,7 @@ class AppConstants {
   //
   // Make sure your backend is running with: uvicorn app.main:app --host 0.0.0.0 --port 8000
   // ============================================
-  static const String baseUrl = 'http://192.168.8.9:8000/api';
+  static const String baseUrl = 'http://10.5.229.43:8000/api';
   
   // Storage Keys
   static const String tokenKey = 'auth_token';
@@ -33,9 +33,6 @@ class AppConstants {
   static const String exams = '/exams';
   static const String examSubmit = '/exams/{exam_id}/submit';
   static const String examResults = '/exams/{exam_id}/results';
-  
-  static const String ragAsk = '/rag/ask';
-  static const String ragProcess = '/rag/process/{course_content_id}';
   
   static const String liveCreateRoom = '/live/create-room';
   static const String liveJoinRoom = '/live/join-room/{room_name}';

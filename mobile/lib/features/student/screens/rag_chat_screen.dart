@@ -197,60 +197,17 @@ class _RAGChatScreenState extends State<RAGChatScreen> {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        // RAG chat feature removed.
         decoration: BoxDecoration(
+
           color: isUser
+
               ? Theme.of(context).colorScheme.secondary
+
               : Colors.grey[200],
+
           borderRadius: BorderRadius.only(
+
             topLeft: const Radius.circular(16),
+
             topRight: const Radius.circular(16),
-            bottomLeft: isUser ? const Radius.circular(16) : Radius.zero,
-            bottomRight: isUser ? Radius.zero : const Radius.circular(16),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message['text'] as String,
-              style: TextStyle(
-                color: isUser ? Colors.white : Colors.black87,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _formatTime(message['timestamp'] as DateTime),
-              style: TextStyle(
-                color: isUser ? Colors.white70 : Colors.grey[600],
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-    }
-  }
-}
-
-
-
-
-
-

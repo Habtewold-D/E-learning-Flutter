@@ -6,11 +6,11 @@ from app.core.database import SessionLocal
 from app.services.live_class_service import _auto_update_statuses
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api import auth, courses, exams, rag, live, live_class
+from app.api import auth, courses, exams, live, live_class
 
 app = FastAPI(
     title="E-Learning Platform API",
-    description="Backend API for e-learning platform with RAG capabilities",
+    description="Backend API for e-learning platform",
     version="1.0.0"
 )
 
@@ -30,7 +30,6 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(courses.router, prefix="/api/courses", tags=["Courses"])
 app.include_router(exams.router, prefix="/api/exams", tags=["Exams"])
-app.include_router(rag.router, prefix="/api/rag", tags=["RAG"])
 app.include_router(live.router, prefix="/api/live", tags=["Live Classes"])
 app.include_router(live_class.router, prefix="/api", tags=["Live Class Scheduling"])
 
