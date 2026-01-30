@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../courses/models/course_model.dart';
+import '../../courses/models/course_browse_model.dart';
 import '../../courses/models/course_content_model.dart';
 import '../../exams/models/exam_model.dart';
 
@@ -26,6 +27,19 @@ class CourseService {
       final response = await _apiClient.get('/courses/');
       final List<dynamic> data = response.data;
       return data.map((json) => Course.fromJson(json)).toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Fetch courses with enrollment counts (uses browse endpoint)
+  Future<List<CourseBrowse>> fetchCoursesWithEnrollment() async {
+    try {
+      final response = await _apiClient.get('/courses/browse');
+      final list = response.data as List<dynamic>;
+      return list
+          .map((json) => CourseBrowse.fromJson(json as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw _handleError(e);
     }

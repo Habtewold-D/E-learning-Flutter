@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
+import '../../courses/models/course_model.dart';
+import '../../courses/models/course_browse_model.dart';
+import '../../exams/models/exam_model.dart';
+import '../services/course_service.dart';
 
 class TeacherHomeScreen extends ConsumerStatefulWidget {
   const TeacherHomeScreen({super.key});
@@ -13,10 +18,64 @@ class TeacherHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
-  // Mock data
-  final int totalCourses = 5;
-  final int totalStudents = 42;
-  final int activeExams = 3;
+  late final CourseService _courseService;
+  List<Course> _courses = [];
+  Map<int, int> _studentsByCourse = {};
+  int _totalExams = 0;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _courseService = CourseService(ApiClient());
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final authState = ref.read(authProvider);
+      final userId = authState.user?.id;
+
+      final courses = await _courseService.fetchMyCourses();
+      final courseIds = courses.map((c) => c.id).toSet();
+
+      final browseCourses = await _courseService.fetchCoursesWithEnrollment();
+      final studentsByCourse = <int, int>{};
+      for (final course in browseCourses) {
+        if (courseIds.contains(course.id) && (userId == null || course.teacherId == userId)) {
+          studentsByCourse[course.id] = course.studentsCount;
+        }
+      }
+
+      int totalExams = 0;
+      if (courses.isNotEmpty) {
+        final examLists = await Future.wait(
+          courses.map((course) => _courseService.fetchExamsByCourse(course.id)),
+        );
+        totalExams = examLists.fold<int>(0, (sum, list) => sum + list.length);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _courses = courses;
+        _studentsByCourse = studentsByCourse;
+        _totalExams = totalExams;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,35 +86,54 @@ class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
       ),
       drawer: const TeacherDrawer(),
       body: RefreshIndicator(
-        onRefresh: () async {
-          // Refresh data
-          await Future.delayed(const Duration(seconds: 1));
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Section
-              _buildWelcomeSection(),
-              const SizedBox(height: 24),
-              
-              // Stats Cards
-              _buildStatsSection(),
-              const SizedBox(height: 24),
-              
-              // Quick Actions
-              _buildQuickActions(),
-              const SizedBox(height: 24),
-              
-              // Recent Courses
-              _buildRecentCourses(),
-            ],
-          ),
-        ),
+        onRefresh: _loadDashboardData,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+                ? _buildErrorState()
+                : SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildWelcomeSection(),
+                        const SizedBox(height: 24),
+                        _buildStatsSection(),
+                        const SizedBox(height: 24),
+                        _buildQuickActions(),
+                        const SizedBox(height: 24),
+                        _buildRecentCourses(),
+                      ],
+                    ),
+                  ),
       ),
       bottomNavigationBar: const TeacherBottomNav(currentIndex: 0),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? 'Failed to load dashboard',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadDashboardData,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -108,6 +186,10 @@ class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
   }
 
   Widget _buildStatsSection() {
+    final totalCourses = _courses.length;
+    final totalStudents = _studentsByCourse.values.fold<int>(0, (sum, value) => sum + value);
+    final activeExams = _totalExams;
+
     return Row(
       children: [
         Expanded(
@@ -250,12 +332,9 @@ class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
   }
 
   Widget _buildRecentCourses() {
-    // Mock recent courses
-    final recentCourses = [
-      {'id': 1, 'title': 'Introduction to Flutter', 'students': 15},
-      {'id': 2, 'title': 'Advanced React', 'students': 12},
-      {'id': 3, 'title': 'Python Basics', 'students': 8},
-    ];
+    final recentCourses = [..._courses];
+    recentCourses.sort((a, b) => b.id.compareTo(a.id));
+    final topCourses = recentCourses.take(3).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,11 +355,20 @@ class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        ...recentCourses.map((course) => _buildCourseCard(
-              courseId: course['id'] as int,
-              title: course['title'] as String,
-              studentCount: course['students'] as int,
-            )),
+        if (topCourses.isEmpty)
+          _buildEmptyState(
+            icon: Icons.book,
+            title: 'No courses yet',
+            subtitle: 'Create your first course to get started.',
+            actionLabel: 'Create Course',
+            onAction: () => context.push('/teacher/create-course'),
+          )
+        else
+          ...topCourses.map((course) => _buildCourseCard(
+                courseId: course.id,
+                title: course.title,
+                studentCount: _studentsByCourse[course.id] ?? 0,
+              )),
       ],
     );
   }
@@ -313,6 +401,40 @@ class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
           color: Colors.grey[400],
         ),
         onTap: () => context.push('/teacher/courses/$courseId'),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Icon(icon, size: 40, color: Colors.grey[400]),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            TextButton(onPressed: onAction, child: Text(actionLabel)),
+          ],
+        ),
       ),
     );
   }
