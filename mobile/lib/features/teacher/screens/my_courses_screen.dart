@@ -414,7 +414,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Course deleted'),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.lightBlue,
         ),
       );
     } catch (e) {

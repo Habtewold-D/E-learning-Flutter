@@ -358,7 +358,7 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Successfully enrolled in ${course.title}'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.lightBlue,
                   ),
                 );
               } catch (e) {

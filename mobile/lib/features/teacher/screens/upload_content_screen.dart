@@ -100,7 +100,7 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Content uploaded successfully!'),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.lightBlue,
         ),
       );
       context.pop(true);

@@ -491,7 +491,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Live class "${title}" created successfully'),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.lightBlue,
         ),
       );
 

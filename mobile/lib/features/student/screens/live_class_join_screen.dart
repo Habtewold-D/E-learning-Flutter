@@ -136,7 +136,7 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.green[100],
+                              color: Colors.lightBlue[100],
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -156,7 +156,7 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
                                 const Text(
                                   'LIVE',
                                   style: TextStyle(
-                                    color: Colors.green,
+                                    color: Colors.lightBlue,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
