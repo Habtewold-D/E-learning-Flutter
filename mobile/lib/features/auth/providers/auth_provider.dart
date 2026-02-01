@@ -68,8 +68,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         data: request.toJson(),
       );
 
-      // Debug: Print response
-      print('Login response: ${response.data}');
 
       final authResponse = AuthResponse.fromJson(response.data);
       
@@ -83,11 +81,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         error: null,
       );
 
-      print('Login successful, user: ${authResponse.user.email}, role: ${authResponse.user.role}');
       return authResponse.user;
     } catch (e, stackTrace) {
-      print('Login error: $e');
-      print('Stack trace: $stackTrace');
       
       String errorMessage = 'Login failed. Please try again.';
       
@@ -104,7 +99,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         } else if (e.response != null) {
           // Handle HTTP error responses
           final data = e.response!.data;
-          print('Error response data: $data');
           if (data is Map<String, dynamic>) {
             if (data.containsKey('detail')) {
               final detail = data['detail'];
@@ -129,7 +123,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorMessage = e.toString().replaceAll('Exception: ', '');
       }
       
-      print('Final error message: $errorMessage');
       state = state.copyWith(
         isLoading: false,
         error: errorMessage,
@@ -154,8 +147,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         data: request.toJson(),
       );
 
-      // Debug: Print response
-      print('Register response: ${response.data}');
 
       final authResponse = AuthResponse.fromJson(response.data);
       
@@ -169,11 +160,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         error: null,
       );
 
-      print('Registration successful, user: ${authResponse.user.email}, role: ${authResponse.user.role}');
       return authResponse.user;
     } catch (e, stackTrace) {
-      print('Register error: $e');
-      print('Stack trace: $stackTrace');
       
       String errorMessage = 'Registration failed. Please try again.';
       
@@ -190,7 +178,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         } else if (e.response != null) {
           // Handle HTTP error responses
           final data = e.response!.data;
-          print('Error response data: $data');
           if (data is Map<String, dynamic>) {
             if (data.containsKey('detail')) {
               final detail = data['detail'];
@@ -215,7 +202,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorMessage = e.toString().replaceAll('Exception: ', '');
       }
       
-      print('Final error message: $errorMessage');
       state = state.copyWith(
         isLoading: false,
         error: errorMessage,

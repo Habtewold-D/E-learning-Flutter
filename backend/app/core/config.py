@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+
+    # JaaS (Jitsi as a Service)
+    JAAS_APP_ID: Optional[str] = None
+    JAAS_PRIVATE_KEY: Optional[str] = None
+    JAAS_API_KEY: Optional[str] = None
     
     class Config:
         env_file = ".env"

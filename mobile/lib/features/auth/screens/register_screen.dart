@@ -45,7 +45,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final router = ref.read(routerProvider);
     final messenger = ScaffoldMessenger.of(context);
 
-    print('Starting registration for: $email, role: $_selectedRole');
     final user = await ref.read(authProvider.notifier).register(
           email,
           password,
@@ -53,12 +52,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           _selectedRole,
         );
 
-    print('Registration call completed, user: ${user?.email}');
-
     if (user != null) {
-      print('Registration successful, showing success message and navigating');
-      print('User role: ${user.role}, isTeacher: ${user.isTeacher}');
-      
       // Determine target route based on user role
       final finalTargetRoute = user.isTeacher ? '/teacher-home' : '/student-home';
       
@@ -82,7 +76,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       // Let the router's redirect function handle navigation automatically
       // The GoRouterRefreshStream will trigger a redirect when auth state changes
       // Just wait for the router to refresh and redirect
-      print('Waiting for router to automatically redirect based on auth state...');
     } else {
       // Registration failed - get error from state if possible
       String errorMessage = 'Registration failed. Please try again.';
@@ -92,10 +85,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           errorMessage = authState.error ?? errorMessage;
         } catch (e) {
           // Widget disposed, use default message
-          print('Could not read error from state: $e');
         }
       }
-      print('Showing error: $errorMessage');
       
       // Use captured messenger to show error
       messenger.clearSnackBars();

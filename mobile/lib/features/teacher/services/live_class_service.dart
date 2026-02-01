@@ -85,6 +85,18 @@ class LiveClassService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchJaasToken(int liveClassId) async {
+    try {
+      final response = await _apiClient.get('/live-classes/$liveClassId/jaas-token');
+      if (response.data is! Map<String, dynamic>) {
+        throw Exception('Unexpected response from server');
+      }
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Exception _handleError(DioException e) {
     if (e.response != null) {
       final statusCode = e.response!.statusCode;

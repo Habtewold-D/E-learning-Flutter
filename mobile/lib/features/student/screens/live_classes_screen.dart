@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/widgets/student_drawer.dart';
-import '../../courses/models/course_model.dart';
+import '../../auth/models/user_model.dart';
+import '../../courses/models/enrolled_course_model.dart';
 import '../../teacher/models/live_class.dart';
-import '../../teacher/services/course_service.dart';
+import '../services/course_service.dart';
 import '../services/live_class_service.dart';
 
 class StudentLiveClassesScreen extends StatefulWidget {
@@ -19,25 +24,56 @@ class StudentLiveClassesScreen extends StatefulWidget {
 
 class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
   late final StudentLiveClassService _liveClassService;
-  late final CourseService _courseService;
+  late final StudentCourseService _courseService;
+  final _jitsiMeet = JitsiMeet();
 
   List<LiveClass> _liveClasses = [];
-  List<Course> _courses = [];
+  List<EnrolledCourse> _courses = [];
   String _filter = 'all'; // 'all', 'upcoming', 'live', 'ended'
   bool _isLoading = true;
   String? _error;
+  User? _currentUser;
+  bool _loadingUser = true;
+  bool _isJoining = false;
 
   @override
   void initState() {
     super.initState();
     _liveClassService = StudentLiveClassService(ApiClient());
-    _courseService = CourseService(ApiClient());
+    _courseService = StudentCourseService(ApiClient());
+    _loadUser();
     _fetchData();
   }
 
   @override
   void dispose() {
+    // Restore system UI overlays when leaving the screen
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Color(0xFF2B2B2B),
+      systemNavigationBarDividerColor: Color(0xFF2B2B2B),
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ));
     super.dispose();
+  }
+
+  Future<void> _loadUser() async {
+    try {
+      final raw = await SecureStorage.getUserData();
+      if (raw != null) {
+        final jsonMap = json.decode(raw) as Map<String, dynamic>;
+        setState(() {
+          _currentUser = User.fromJson(jsonMap);
+          _loadingUser = false;
+        });
+      } else {
+        setState(() => _loadingUser = false);
+      }
+    } catch (_) {
+      setState(() => _loadingUser = false);
+    }
   }
 
   Future<void> _fetchData() async {
@@ -48,10 +84,15 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
 
     try {
       final liveClasses = await _liveClassService.fetchLiveClasses();
-      final courses = await _courseService.fetchCourses();
+      final courses = await _courseService.fetchEnrolledCourses();
+
+      final enrolledCourseIds = courses.map((c) => c.id).toSet();
+      final filteredLiveClasses = liveClasses
+          .where((liveClass) => enrolledCourseIds.contains(liveClass.courseId))
+          .toList();
 
       setState(() {
-        _liveClasses = liveClasses;
+        _liveClasses = filteredLiveClasses;
         _courses = courses;
         _isLoading = false;
       });
@@ -205,12 +246,13 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
 
     final course = _courses.firstWhere(
       (c) => c.id == liveClass.courseId,
-      orElse: () => Course(
+      orElse: () => EnrolledCourse(
         id: liveClass.courseId,
         title: 'Course #${liveClass.courseId}',
         description: '',
-        teacherId: liveClass.teacherId,
-        createdAt: DateTime.now(),
+        contentCount: 0,
+        completedContent: 0,
+        progress: 0,
       ),
     );
 
@@ -225,11 +267,17 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
       ),
       child: InkWell(
         onTap: () {
-          if (status == 'active' || status == 'scheduled') {
+          if (status == 'active') {
             _handleJoin(liveClass);
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('This live class has ended')),
+              SnackBar(
+                content: Text(
+                  status == 'scheduled'
+                      ? 'Class has not started yet. Please wait for the teacher.'
+                      : 'This live class has ended',
+                ),
+              ),
             );
           }
         },
@@ -326,7 +374,7 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: (status == 'active' || status == 'scheduled')
+                  onPressed: status == 'active'
                       ? () => _handleJoin(liveClass)
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -338,7 +386,7 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
                     status == 'active'
                         ? 'Join Now'
                         : status == 'scheduled'
-                            ? 'Join When Live'
+                            ? 'Waiting for teacher'
                             : 'Class Ended',
                   ),
                 ),
@@ -375,7 +423,13 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
     try {
       final joined = await _liveClassService.joinLiveClass(liveClass.id);
       if (!mounted) return;
-      context.push('/student/live/${joined.roomName}');
+      final tokenResponse = await _liveClassService.fetchJaasToken(joined.id);
+      if (!mounted) return;
+      await _joinRoomDirectly(
+        tokenResponse['room'] as String,
+        tokenResponse['token'] as String,
+        tokenResponse['server_url'] as String,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -383,6 +437,110 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
       );
     }
   }
+
+  Future<void> _joinRoomDirectly(
+    String roomName,
+    String token,
+    String serverUrl,
+  ) async {
+    if (_isJoining) return;
+    _isJoining = true;
+    if (_loadingUser) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Preparing meeting...')),
+        );
+      }
+      _isJoining = false;
+      return;
+    }
+
+
+    try {
+      // Darken status and navigation bars while Jitsi is active
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        statusBarColor: Color(0xFF2B2B2B),
+        systemNavigationBarColor: Color(0xFF2B2B2B),
+        systemNavigationBarDividerColor: Color(0xFF2B2B2B),
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ));
+
+      final options = JitsiMeetConferenceOptions(
+        room: _coerceRoomName(roomName),
+        serverURL: serverUrl,
+        token: token,
+        configOverrides: {
+          "startWithAudioMuted": true,
+          "startWithVideoMuted": true,
+          "prejoinPageEnabled": false,
+          "requireDisplayName": false,
+          "disableLobbyMode": true,
+          "knockingEnabled": false,
+          "lobbyEnabled": false,
+          "enableLobby": false,
+          "lobby.enabled": false,
+          "lobbyModeEnabled": false,
+          "membersOnly": false,
+          "subject": "Live Class",
+          "disableDeepLinking": true,
+        },
+        featureFlags: {
+          "unsaferoomwarning.enabled": false,
+          "ios.recording.enabled": false,
+          "lobby-mode.enabled": false,
+          "prejoinpage.enabled": false,
+        },
+        userInfo: JitsiMeetUserInfo(
+          displayName: _buildDisplayName(),
+          email: _currentUser?.email ?? "",
+        ),
+      );
+
+      await _jitsiMeet.join(options);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error joining meeting: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      _isJoining = false;
+    }
+  }
+
+  String _coerceRoomName(String roomName) {
+    var normalized = roomName.trim();
+    if (normalized.startsWith('vpaas-') && normalized.contains('/')) {
+      return normalized;
+    }
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      try {
+        final uri = Uri.parse(normalized);
+        if (uri.pathSegments.isNotEmpty) {
+          normalized = uri.pathSegments.last;
+        }
+      } catch (_) {
+        // Use original string if parsing fails
+      }
+    }
+    if (normalized.contains('/')) {
+      normalized = normalized.split('/').last;
+    }
+    return normalized;
+  }
+
+  String _buildDisplayName() {
+    final user = _currentUser;
+    if (user == null) return 'Student';
+    final role = user.role.isNotEmpty ? user.role : 'student';
+    return '${user.name} ($role #${user.id})';
+  }
+
 }
 
 

@@ -4,16 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../auth/models/user_model.dart';
+import '../services/live_class_service.dart';
 
 class StudentLiveClassJoinScreen extends StatefulWidget {
   final String roomName;
+  final int? liveClassId;
 
   const StudentLiveClassJoinScreen({
     super.key,
     required this.roomName,
+    this.liveClassId,
   });
 
   @override
@@ -22,12 +26,15 @@ class StudentLiveClassJoinScreen extends StatefulWidget {
 
 class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen> {
   final _jitsiMeet = JitsiMeet();
+  late final StudentLiveClassService _liveClassService;
   User? _currentUser;
   bool _loadingUser = true;
+  bool _isJoining = false;
 
   @override
   void initState() {
     super.initState();
+    _liveClassService = StudentLiveClassService(ApiClient());
   }
 
   @override
@@ -51,6 +58,7 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
     } catch (_) {
       setState(() => _loadingUser = false);
     }
+
   }
 
   @override
@@ -209,12 +217,24 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
   }
 
   Future<void> _joinLiveClass(String roomName) async {
+    if (_isJoining) return;
+    _isJoining = true;
     if (_loadingUser) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Preparing meeting...')),
       );
+      _isJoining = false;
       return;
     }
+
+    if (widget.liveClassId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Missing live class id. Please retry.')),
+      );
+      _isJoining = false;
+      return;
+    }
+
 
     try {
       // Darken status and navigation bars while Jitsi is active
@@ -227,9 +247,15 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
         systemNavigationBarIconBrightness: Brightness.light,
       ));
 
+      final tokenResponse = await _liveClassService.fetchJaasToken(widget.liveClassId!);
+      final serverUrl = tokenResponse['server_url'] as String;
+      final token = tokenResponse['token'] as String;
+      final room = _coerceRoomName(tokenResponse['room'] as String);
+
       var options = JitsiMeetConferenceOptions(
-        room: roomName,
-        serverURL: "https://meet.jit.si",
+        room: room,
+        serverURL: serverUrl,
+        token: token,
         configOverrides: {
           "startWithAudioMuted": true,
           "startWithVideoMuted": true,
@@ -239,6 +265,9 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
           "knockingEnabled": false,
           "lobbyEnabled": false,
           "enableLobby": false,
+          "lobby.enabled": false,
+          "lobbyModeEnabled": false,
+          "membersOnly": false,
           "subject": "Live Class",
           "disableDeepLinking": true,
         },
@@ -249,7 +278,7 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
           "prejoinpage.enabled": false,
         },
         userInfo: JitsiMeetUserInfo(
-          displayName: _currentUser?.name ?? "Student",
+          displayName: _buildDisplayName(),
           email: _currentUser?.email ?? "",
         ),
       );
@@ -264,7 +293,37 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
           ),
         );
       }
+    } finally {
+      _isJoining = false;
     }
+  }
+
+  String _coerceRoomName(String roomName) {
+    var normalized = roomName.trim();
+    if (normalized.startsWith('vpaas-') && normalized.contains('/')) {
+      return normalized;
+    }
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      try {
+        final uri = Uri.parse(normalized);
+        if (uri.pathSegments.isNotEmpty) {
+          normalized = uri.pathSegments.last;
+        }
+      } catch (_) {
+        // Use original string if parsing fails
+      }
+    }
+    if (normalized.contains('/')) {
+      normalized = normalized.split('/').last;
+    }
+    return normalized;
+  }
+
+  String _buildDisplayName() {
+    final user = _currentUser;
+    if (user == null) return 'Student';
+    final role = user.role.isNotEmpty ? user.role : 'student';
+    return '${user.name} ($role #${user.id})';
   }
 
   @override
@@ -280,4 +339,5 @@ class _StudentLiveClassJoinScreenState extends State<StudentLiveClassJoinScreen>
     ));
     super.dispose();
   }
+
 }

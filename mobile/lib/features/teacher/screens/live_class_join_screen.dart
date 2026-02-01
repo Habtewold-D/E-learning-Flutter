@@ -5,16 +5,20 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/widgets/teacher_drawer.dart';
 import '../../auth/models/user_model.dart';
+import '../services/live_class_service.dart';
 
 class LiveClassJoinScreen extends StatefulWidget {
   final String roomName;
+  final int? liveClassId;
 
   const LiveClassJoinScreen({
     super.key,
     required this.roomName,
+    this.liveClassId,
   });
 
   @override
@@ -23,12 +27,14 @@ class LiveClassJoinScreen extends StatefulWidget {
 
 class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
   final _jitsiMeet = JitsiMeet();
+  late final LiveClassService _liveClassService;
   User? _currentUser;
   bool _loadingUser = true;
 
   @override
   void initState() {
     super.initState();
+    _liveClassService = LiveClassService(ApiClient());
     _setupJitsiListeners();
   }
 
@@ -66,7 +72,6 @@ class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
     final liveClass = {
       'roomName': widget.roomName,
       'courseName': 'Live Class', // TODO: Fetch from API
-      'roomUrl': 'https://meet.jit.si/${widget.roomName}',
       'participants': 0, // TODO: Add participant count
       'status': 'active',
     };
@@ -196,51 +201,6 @@ class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Room URL (for sharing)
-                  Card(
-                    color: Colors.grey[50],
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.link, size: 16, color: Colors.grey[600]),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Room URL',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          SelectableText(
-                            liveClass['roomUrl'] as String,
-                            style: TextStyle(
-                              color: Colors.blue[700],
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _copyToClipboard(liveClass['roomUrl'] as String),
-                              icon: const Icon(Icons.copy, size: 16),
-                              label: const Text('Copy URL'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
                   // Info
                   Card(
                     color: Colors.blue[50],
@@ -280,6 +240,14 @@ class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
       return;
     }
 
+    if (widget.liveClassId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Missing live class id. Please retry.')),
+      );
+      return;
+    }
+
+
     try {
       // Darken status and navigation bars while Jitsi is active
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -291,9 +259,15 @@ class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
         systemNavigationBarIconBrightness: Brightness.light,
       ));
 
+      final tokenResponse = await _liveClassService.fetchJaasToken(widget.liveClassId!);
+      final serverUrl = tokenResponse['server_url'] as String;
+      final token = tokenResponse['token'] as String;
+      final room = tokenResponse['room'] as String;
+
       var options = JitsiMeetConferenceOptions(
-        room: roomName,
-        serverURL: "https://meet.jit.si",
+        room: _coerceRoomName(room),
+        serverURL: serverUrl,
+        token: token,
         configOverrides: {
           // reduce prejoin friction and keep everything in-app
           "startWithAudioMuted": true,
@@ -304,6 +278,9 @@ class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
           "knockingEnabled": false,
           "lobbyEnabled": false,
           "enableLobby": false,
+          "lobby.enabled": false,
+          "lobbyModeEnabled": false,
+          "membersOnly": false,
           "subject": "Live Class",
           "disableDeepLinking": true,
         },
@@ -314,7 +291,7 @@ class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
           "prejoinpage.enabled": false,
         },
         userInfo: JitsiMeetUserInfo(
-          displayName: _currentUser?.name ?? "Guest",
+          displayName: _buildDisplayName(),
           email: _currentUser?.email ?? "",
         ),
       );
@@ -332,6 +309,34 @@ class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
     }
   }
 
+  String _coerceRoomName(String roomName) {
+    var normalized = roomName.trim();
+    if (normalized.startsWith('vpaas-') && normalized.contains('/')) {
+      return normalized;
+    }
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      try {
+        final uri = Uri.parse(normalized);
+        if (uri.pathSegments.isNotEmpty) {
+          normalized = uri.pathSegments.last;
+        }
+      } catch (_) {
+        // Use original string if parsing fails
+      }
+    }
+    if (normalized.contains('/')) {
+      normalized = normalized.split('/').last;
+    }
+    return normalized;
+  }
+
+  String _buildDisplayName() {
+    final user = _currentUser;
+    if (user == null) return 'Teacher';
+    final role = user.role.isNotEmpty ? user.role : 'teacher';
+    return '${user.name} ($role #${user.id})';
+  }
+
   @override
   void dispose() {
     // Restore system UI overlays when leaving the screen
@@ -346,14 +351,6 @@ class _LiveClassJoinScreenState extends State<LiveClassJoinScreen> {
     super.dispose();
   }
 
-  Future<void> _copyToClipboard(String url) async {
-    // TODO: Implement clipboard functionality
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Room URL copied to clipboard')),
-      );
-    }
-  }
 }
 
 

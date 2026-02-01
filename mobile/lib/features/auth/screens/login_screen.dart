@@ -34,8 +34,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    print('Starting login for: $email');
-    
     // Get router and messenger from provider/context before async call
     final router = ref.read(routerProvider);
     final messenger = ScaffoldMessenger.of(context);
@@ -43,12 +41,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     
     try {
       final user = await ref.read(authProvider.notifier).login(email, password);
-      print('Login call completed, user: ${user?.email}');
 
       if (user != null) {
-        print('Login successful, showing success message and navigating');
-        print('User role: ${user.role}, isTeacher: ${user.isTeacher}');
-        
         // Determine target route based on user role
         final finalTargetRoute = user.isTeacher ? '/teacher-home' : '/student-home';
         
@@ -70,7 +64,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // Let the router's redirect function handle navigation automatically
         // The GoRouterRefreshStream will trigger a redirect when auth state changes
         // Just wait for the router to refresh and redirect
-        print('Waiting for router to automatically redirect based on auth state...');
       } else {
         // Login failed - get error from state if possible
         String errorMessage = 'Login failed. Please try again.';
@@ -80,10 +73,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             errorMessage = authState.error ?? errorMessage;
           } catch (e) {
             // Widget disposed, use default message
-            print('Could not read error from state: $e');
           }
         }
-        print('Showing error message: $errorMessage');
         
         // Use captured messenger to show error
         messenger.clearSnackBars();
@@ -104,8 +95,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // Don't clear form on error - user can retry
       }
     } catch (e, stackTrace) {
-      print('Exception in _handleLogin: $e');
-      print('Stack trace: $stackTrace');
       messenger.showSnackBar(
         SnackBar(
           content: Text('Unexpected error: ${e.toString()}'),

@@ -369,7 +369,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
       final updated = await _liveClassService.startLiveClass(liveClass.id);
       await _refreshData();
       // navigate to join screen
-      context.push('/teacher/live/${updated.roomName}');
+      context.push('/teacher/live/${updated.roomName}?classId=${updated.id}');
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -380,7 +380,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
 
   Future<void> _joinClass(LiveClass liveClass) async {
     // navigate to join screen which opens Jitsi URL
-    context.push('/teacher/live/${liveClass.roomName}');
+    context.push('/teacher/live/${liveClass.roomName}?classId=${liveClass.id}');
   }
 
   void _showCreateClassDialog(BuildContext context) {
