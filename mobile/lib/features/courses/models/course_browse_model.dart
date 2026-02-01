@@ -7,6 +7,7 @@ class CourseBrowse {
   final int studentsCount;
   final int contentCount;
   final bool isEnrolled;
+  final String? enrollmentStatus;
 
   CourseBrowse({
     required this.id,
@@ -17,6 +18,7 @@ class CourseBrowse {
     required this.studentsCount,
     required this.contentCount,
     required this.isEnrolled,
+    this.enrollmentStatus,
   });
 
   factory CourseBrowse.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class CourseBrowse {
       studentsCount: (json['students_count'] as num?)?.toInt() ?? 0,
       contentCount: (json['content_count'] as num?)?.toInt() ?? 0,
       isEnrolled: json['is_enrolled'] as bool? ?? false,
+      enrollmentStatus: json['enrollment_status'] as String?,
     );
   }
 
@@ -41,6 +44,7 @@ class CourseBrowse {
     int? studentsCount,
     int? contentCount,
     bool? isEnrolled,
+    String? enrollmentStatus,
   }) {
     return CourseBrowse(
       id: id ?? this.id,
@@ -51,6 +55,7 @@ class CourseBrowse {
       studentsCount: studentsCount ?? this.studentsCount,
       contentCount: contentCount ?? this.contentCount,
       isEnrolled: isEnrolled ?? this.isEnrolled,
+      enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
     );
   }
 }

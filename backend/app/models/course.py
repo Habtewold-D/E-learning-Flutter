@@ -10,6 +10,12 @@ class ContentType(str, enum.Enum):
     PDF = "pdf"
 
 
+class EnrollmentStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class Course(Base):
     __tablename__ = "courses"
 
@@ -49,6 +55,7 @@ class Enrollment(Base):
     id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(Enum(EnrollmentStatus), nullable=False, default=EnrollmentStatus.PENDING)
     enrolled_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     course = relationship("Course", back_populates="enrollments")

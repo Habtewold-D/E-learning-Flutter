@@ -4,7 +4,7 @@ from sqlalchemy import func
 from typing import List
 from app.core.database import get_db
 from app.models.user import User, UserRole
-from app.models.course import Course, CourseContent, ContentType, Enrollment, ContentProgress
+from app.models.course import Course, CourseContent, ContentType, Enrollment, ContentProgress, EnrollmentStatus
 from app.schemas.course import (
     CourseCreate,
     CourseResponse,
@@ -15,6 +15,7 @@ from app.schemas.course import (
     EnrolledCourseResponse,
     CourseProgressResponse,
     EnrollmentResponse,
+    EnrollmentRequestResponse,
     CourseUpdate,
     StudentSummary,
 )
@@ -59,13 +60,13 @@ async def browse_courses(
 ):
     """List courses with enrollment info for students."""
     courses = db.query(Course).all()
-    enrolled_course_ids = {
-        e.course_id
-        for e in db.query(Enrollment).filter(Enrollment.student_id == current_user.id).all()
-    }
+    enrollments = db.query(Enrollment).filter(Enrollment.student_id == current_user.id).all()
+    enrollment_by_course = {e.course_id: e for e in enrollments}
 
     responses: List[CourseBrowseResponse] = []
     for course in courses:
+        enrollment = enrollment_by_course.get(course.id)
+        enrollment_status = enrollment.status if enrollment else None
         responses.append(
             CourseBrowseResponse(
                 id=course.id,
@@ -73,9 +74,10 @@ async def browse_courses(
                 description=course.description,
                 teacher_id=course.teacher_id,
                 teacher_name=course.teacher.name if course.teacher else "",
-                students_count=len(course.enrollments),
+                students_count=len([e for e in course.enrollments if e.status == EnrollmentStatus.APPROVED]),
                 content_count=len(course.contents),
-                is_enrolled=course.id in enrolled_course_ids,
+                is_enrolled=enrollment_status == EnrollmentStatus.APPROVED,
+                enrollment_status=enrollment_status,
             )
         )
     return responses
@@ -125,7 +127,10 @@ async def list_course_students(
     if course.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="You can only view your own course")
 
-    enrollments = db.query(Enrollment).filter(Enrollment.course_id == course_id).all()
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.status == EnrollmentStatus.APPROVED,
+    ).all()
     return [
         StudentSummary(
             id=e.student.id,
@@ -239,7 +244,7 @@ async def enroll_in_course(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Enroll current student in a course."""
+    """Request enrollment in a course (pending approval)."""
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Only students can enroll")
     course = db.query(Course).filter(Course.id == course_id).first()
@@ -251,13 +256,31 @@ async def enroll_in_course(
         Enrollment.student_id == current_user.id
     ).first()
     if existing:
-        return EnrollmentResponse(course_id=course_id, student_id=current_user.id, enrolled_at=str(existing.enrolled_at))
+        if existing.status == EnrollmentStatus.REJECTED:
+            existing.status = EnrollmentStatus.PENDING
+            db.commit()
+            db.refresh(existing)
+        return EnrollmentResponse(
+            course_id=course_id,
+            student_id=current_user.id,
+            enrolled_at=str(existing.enrolled_at),
+            status=existing.status,
+        )
 
-    enrollment = Enrollment(course_id=course_id, student_id=current_user.id)
+    enrollment = Enrollment(
+        course_id=course_id,
+        student_id=current_user.id,
+        status=EnrollmentStatus.PENDING,
+    )
     db.add(enrollment)
     db.commit()
     db.refresh(enrollment)
-    return EnrollmentResponse(course_id=course_id, student_id=current_user.id, enrolled_at=str(enrollment.enrolled_at))
+    return EnrollmentResponse(
+        course_id=course_id,
+        student_id=current_user.id,
+        enrolled_at=str(enrollment.enrolled_at),
+        status=enrollment.status,
+    )
 
 
 @router.delete("/{course_id}/enroll")
@@ -296,7 +319,10 @@ async def list_enrolled_courses(
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="Only students can access this endpoint")
 
-    enrollments = db.query(Enrollment).filter(Enrollment.student_id == current_user.id).all()
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.student_id == current_user.id,
+        Enrollment.status == EnrollmentStatus.APPROVED,
+    ).all()
     course_ids = [e.course_id for e in enrollments]
     courses = db.query(Course).filter(Course.id.in_(course_ids)).all() if course_ids else []
 
@@ -323,6 +349,110 @@ async def list_enrolled_courses(
             )
         )
     return responses
+
+
+@router.get("/requests/pending", response_model=List[EnrollmentRequestResponse])
+async def list_pending_requests(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List pending enrollment requests for the current teacher."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can access requests")
+
+    pending = (
+        db.query(Enrollment)
+        .join(Course, Enrollment.course_id == Course.id)
+        .filter(
+            Course.teacher_id == current_user.id,
+            Enrollment.status == EnrollmentStatus.PENDING,
+        )
+        .all()
+    )
+
+    responses: List[EnrollmentRequestResponse] = []
+    for enrollment in pending:
+        responses.append(
+            EnrollmentRequestResponse(
+                id=enrollment.id,
+                course_id=enrollment.course_id,
+                course_title=enrollment.course.title,
+                student_id=enrollment.student_id,
+                student_name=enrollment.student.name,
+                student_email=enrollment.student.email,
+                status=enrollment.status,
+                requested_at=str(enrollment.enrolled_at),
+            )
+        )
+    return responses
+
+
+@router.post("/requests/{request_id}/approve", response_model=EnrollmentRequestResponse)
+async def approve_enrollment_request(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Approve a pending enrollment request (teacher only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can approve requests")
+
+    enrollment = (
+        db.query(Enrollment)
+        .join(Course, Enrollment.course_id == Course.id)
+        .filter(Enrollment.id == request_id, Course.teacher_id == current_user.id)
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    enrollment.status = EnrollmentStatus.APPROVED
+    db.commit()
+    db.refresh(enrollment)
+    return EnrollmentRequestResponse(
+        id=enrollment.id,
+        course_id=enrollment.course_id,
+        course_title=enrollment.course.title,
+        student_id=enrollment.student_id,
+        student_name=enrollment.student.name,
+        student_email=enrollment.student.email,
+        status=enrollment.status,
+        requested_at=str(enrollment.enrolled_at),
+    )
+
+
+@router.post("/requests/{request_id}/reject", response_model=EnrollmentRequestResponse)
+async def reject_enrollment_request(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reject a pending enrollment request (teacher only)."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can reject requests")
+
+    enrollment = (
+        db.query(Enrollment)
+        .join(Course, Enrollment.course_id == Course.id)
+        .filter(Enrollment.id == request_id, Course.teacher_id == current_user.id)
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    enrollment.status = EnrollmentStatus.REJECTED
+    db.commit()
+    db.refresh(enrollment)
+    return EnrollmentRequestResponse(
+        id=enrollment.id,
+        course_id=enrollment.course_id,
+        course_title=enrollment.course.title,
+        student_id=enrollment.student_id,
+        student_name=enrollment.student.name,
+        student_email=enrollment.student.email,
+        status=enrollment.status,
+        requested_at=str(enrollment.enrolled_at),
+    )
 
 
 @router.post("/{course_id}/content/{content_id}/complete")

@@ -202,13 +202,27 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
 
   Widget _buildCourseCard(CourseBrowse course) {
     final isEnrolled = course.isEnrolled;
+    final enrollmentStatus = course.enrollmentStatus;
+    final isPending = enrollmentStatus == 'pending';
+    final isRejected = enrollmentStatus == 'rejected';
+    final isApproved = enrollmentStatus == 'approved' || isEnrolled;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () => context.push('/student/courses/${course.id}'),
+        onTap: () {
+          if (isApproved) {
+            context.push('/student/courses/${course.id}');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Request approval from the teacher to access this course.'),
+              ),
+            );
+          }
+        },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -242,7 +256,7 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                                 ),
                               ),
                             ),
-                            if (isEnrolled)
+                            if (isApproved)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
@@ -253,6 +267,38 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                                   'Enrolled',
                                   style: TextStyle(
                                     color: Colors.green[800],
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            if (isPending)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Pending',
+                                  style: TextStyle(
+                                    color: Colors.orange[800],
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            if (isRejected)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Rejected',
+                                  style: TextStyle(
+                                    color: Colors.red[800],
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -304,20 +350,30 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (isEnrolled) {
-                      context.push('/student/courses/${course.id}');
-                    } else {
-                      _enrollInCourse(course);
-                    }
-                  },
+                  onPressed: isPending
+                      ? null
+                      : () {
+                          if (isApproved) {
+                            context.push('/student/courses/${course.id}');
+                          } else {
+                            _enrollInCourse(course);
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isEnrolled
+                    backgroundColor: isApproved
                         ? Theme.of(context).colorScheme.secondary
                         : Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,
                   ),
-                  child: Text(isEnrolled ? 'Continue Learning' : 'Enroll Now'),
+                  child: Text(
+                    isApproved
+                        ? 'Continue Learning'
+                        : isPending
+                            ? 'Pending Approval'
+                            : isRejected
+                                ? 'Request Again'
+                                : 'Request to Enroll',
+                  ),
                 ),
               ),
             ],
@@ -331,8 +387,8 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Enroll in Course'),
-        content: Text('Are you sure you want to enroll in "${course.title}"?'),
+        title: const Text('Request Enrollment'),
+        content: Text('Send a request to enroll in "${course.title}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -348,8 +404,8 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                   _allCourses = _allCourses.map((item) {
                     if (item.id == course.id) {
                       return item.copyWith(
-                        isEnrolled: true,
-                        studentsCount: item.studentsCount + 1,
+                        isEnrolled: false,
+                        enrollmentStatus: 'pending',
                       );
                     }
                     return item;
@@ -357,7 +413,7 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Successfully enrolled in ${course.title}'),
+                    content: Text('Enrollment request sent for ${course.title}'),
                     backgroundColor: Colors.lightBlue,
                   ),
                 );
@@ -371,7 +427,7 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
                 );
               }
             },
-            child: const Text('Enroll'),
+            child: const Text('Send Request'),
           ),
         ],
       ),

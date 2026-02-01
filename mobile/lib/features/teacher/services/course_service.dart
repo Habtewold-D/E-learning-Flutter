@@ -5,6 +5,7 @@ import '../../courses/models/course_browse_model.dart';
 import '../../courses/models/course_content_model.dart';
 import '../../courses/models/student_summary_model.dart';
 import '../../exams/models/exam_model.dart';
+import '../models/enrollment_request_model.dart';
 
 class CourseService {
   final ApiClient _apiClient;
@@ -122,6 +123,39 @@ class CourseService {
       return contents
           .map((json) => CourseContent.fromJson(json as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Fetch pending enrollment requests for teacher
+  Future<List<EnrollmentRequest>> fetchPendingEnrollmentRequests() async {
+    try {
+      final response = await _apiClient.get('/courses/requests/pending');
+      final list = response.data as List<dynamic>;
+      return list
+          .map((json) => EnrollmentRequest.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Approve enrollment request
+  Future<EnrollmentRequest> approveEnrollmentRequest(int requestId) async {
+    try {
+      final response = await _apiClient.post('/courses/requests/$requestId/approve');
+      return EnrollmentRequest.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Reject enrollment request
+  Future<EnrollmentRequest> rejectEnrollmentRequest(int requestId) async {
+    try {
+      final response = await _apiClient.post('/courses/requests/$requestId/reject');
+      return EnrollmentRequest.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }

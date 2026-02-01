@@ -30,6 +30,7 @@ import '../../features/teacher/screens/exam_submissions_screen.dart';
 import '../../features/teacher/screens/live_classes_screen.dart';
 import '../../features/teacher/screens/live_class_join_screen.dart';
 import '../../features/teacher/screens/teacher_profile_screen.dart';
+import '../../features/teacher/screens/enrollment_requests_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Watch auth state to trigger router rebuilds
@@ -166,6 +167,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/teacher/exams',
         name: 'teacher-exams',
         builder: (context, state) => const ExamsManagementScreen(),
+      ),
+      GoRoute(
+        path: '/teacher/requests',
+        name: 'teacher-requests',
+        builder: (context, state) => const EnrollmentRequestsScreen(),
       ),
       GoRoute(
         path: '/teacher/exams/:id',

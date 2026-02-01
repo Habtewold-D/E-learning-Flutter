@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from app.models.course import ContentType
+from app.models.course import ContentType, EnrollmentStatus
 
 
 class CourseCreate(BaseModel):
@@ -48,6 +48,18 @@ class EnrollmentResponse(BaseModel):
     course_id: int
     student_id: int
     enrolled_at: Optional[str] = None
+    status: EnrollmentStatus = EnrollmentStatus.PENDING
+
+
+class EnrollmentRequestResponse(BaseModel):
+    id: int
+    course_id: int
+    course_title: str
+    student_id: int
+    student_name: str
+    student_email: str
+    status: EnrollmentStatus
+    requested_at: Optional[str] = None
 
 
 class CourseBrowseResponse(BaseModel):
@@ -59,6 +71,7 @@ class CourseBrowseResponse(BaseModel):
     students_count: int
     content_count: int
     is_enrolled: bool
+    enrollment_status: Optional[EnrollmentStatus] = None
 
 
 class EnrolledCourseResponse(BaseModel):

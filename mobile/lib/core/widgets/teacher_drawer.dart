@@ -121,6 +121,15 @@ class TeacherDrawer extends ConsumerWidget {
               context.go('/teacher/exams');
             },
           ),
+          _buildDrawerItem(
+            context,
+            icon: Icons.how_to_reg,
+            title: 'Enrollment Requests',
+            onTap: () {
+              Navigator.pop(context);
+              context.pushNamed('teacher-requests');
+            },
+          ),
           const Divider(),
           _buildDrawerItem(
             context,
