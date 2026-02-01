@@ -31,6 +31,9 @@ import '../../features/teacher/screens/live_classes_screen.dart';
 import '../../features/teacher/screens/live_class_join_screen.dart';
 import '../../features/teacher/screens/teacher_profile_screen.dart';
 import '../../features/teacher/screens/enrollment_requests_screen.dart';
+import '../../features/admin/screens/admin_home_screen.dart';
+import '../../features/admin/screens/admin_teachers_screen.dart';
+import '../../features/admin/screens/admin_reports_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Watch auth state to trigger router rebuilds
@@ -48,10 +51,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoginPage = state.uri.path == '/login' || state.uri.path == '/register';
       final isHomePage = state.uri.path == '/teacher-home' || 
                          state.uri.path == '/teacher/home' ||
+                         state.uri.path == '/admin-home' ||
+                         state.uri.path == '/admin/home' ||
                          state.uri.path == '/student-home' ||
                          state.uri.path == '/student/home';
       final isTeacherRoute = state.uri.path.startsWith('/teacher');
       final isStudentRoute = state.uri.path.startsWith('/student');
+      final isAdminRoute = state.uri.path.startsWith('/admin');
 
       // If not authenticated and trying to access protected route
       if (!isAuthenticated && !isLoginPage) {
@@ -68,6 +74,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (currentAuthState.isStudent && isTeacherRoute) {
           return '/student/home';
         }
+        // Admin trying to access non-admin routes
+        if (currentAuthState.isAdmin && (isTeacherRoute || isStudentRoute)) {
+          return '/admin/home';
+        }
+        // Non-admin trying to access admin routes
+        if (!currentAuthState.isAdmin && isAdminRoute) {
+          return currentAuthState.isTeacher ? '/teacher/home' : '/student/home';
+        }
       }
 
       // If authenticated and accessing home, ensure correct role-based home
@@ -75,8 +89,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (currentAuthState.isTeacher && state.uri.path == '/student-home') {
           return '/teacher/home';
         }
+        if (currentAuthState.isAdmin && state.uri.path == '/student-home') {
+          return '/admin/home';
+        }
         if (currentAuthState.isStudent && (state.uri.path == '/teacher-home' || state.uri.path == '/teacher/home')) {
           return '/student/home';
+        }
+        if (currentAuthState.isAdmin && (state.uri.path == '/teacher-home' || state.uri.path == '/teacher/home')) {
+          return '/admin/home';
         }
         // If role matches, allow navigation
         return null;
@@ -84,7 +104,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // If authenticated and on login/register page, redirect to appropriate home
       if (isAuthenticated && isLoginPage) {
-        if (currentAuthState.isTeacher) {
+        if (currentAuthState.isAdmin) {
+          return '/admin/home';
+        } else if (currentAuthState.isTeacher) {
           return '/teacher/home';
         } else {
           return '/student/home';
@@ -114,6 +136,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/student-home',
         redirect: (context, state) => '/student/home',
       ),
+      GoRoute(
+        path: '/admin-home',
+        redirect: (context, state) => '/admin/home',
+      ),
 
       // Teacher Routes
       GoRoute(
@@ -121,9 +147,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         redirect: (context, state) => '/teacher/home',
       ),
       GoRoute(
+        path: '/admin',
+        redirect: (context, state) => '/admin/home',
+      ),
+      GoRoute(
         path: '/teacher/home',
         name: 'teacher-home',
         builder: (context, state) => const TeacherHomeScreen(),
+      ),
+      GoRoute(
+        path: '/admin/home',
+        name: 'admin-home',
+        builder: (context, state) => const AdminHomeScreen(),
+      ),
+      GoRoute(
+        path: '/admin/teachers',
+        name: 'admin-teachers',
+        builder: (context, state) => const AdminTeachersScreen(),
+      ),
+      GoRoute(
+        path: '/admin/reports',
+        name: 'admin-reports',
+        builder: (context, state) => const AdminReportsScreen(),
       ),
       GoRoute(
         path: '/teacher/courses',

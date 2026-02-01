@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserLogin, Token, UserResponse, UserUpdate, PasswordChange
 from app.api.dependencies import get_current_user
 
@@ -12,6 +12,8 @@ router = APIRouter()
 @router.post("/register", response_model=Token)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """Register a new user."""
+    if user_data.role == UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Admin registration is not allowed")
     # Check if user exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
