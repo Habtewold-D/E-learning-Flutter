@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../auth/models/user_model.dart';
@@ -77,10 +78,35 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
   }
 
   Future<void> _fetchData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    var hadCache = false;
+    final cachedLive = await CacheService.getJson('cache:student:live_classes');
+    final cachedCourses = await CacheService.getJson('cache:student:enrolled_courses');
+
+    if (cachedLive is List || cachedCourses is List) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        if (cachedLive is List) {
+          _liveClasses = cachedLive
+              .map((json) => LiveClass.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+        if (cachedCourses is List) {
+          _courses = cachedCourses
+              .map((json) => EnrolledCourse.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final liveClasses = await _liveClassService.fetchLiveClasses();
@@ -95,12 +121,20 @@ class _StudentLiveClassesScreenState extends State<StudentLiveClassesScreen> {
         _liveClasses = filteredLiveClasses;
         _courses = courses;
         _isLoading = false;
+        _error = null;
       });
+
+      await CacheService.setJson(
+        'cache:student:live_classes',
+        filteredLiveClasses.map((e) => e.toJson()).toList(),
+      );
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

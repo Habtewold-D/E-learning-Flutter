@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/admin_bottom_nav.dart';
+import '../../../core/widgets/admin_drawer.dart';
 import '../models/admin_stats_model.dart';
 import '../services/admin_service.dart';
 
@@ -25,22 +27,41 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _loadStats() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    const cacheKey = 'cache:admin:stats';
+    var hadCache = false;
+
+    final cached = await CacheService.getJson(cacheKey);
+    if (cached is Map<String, dynamic>) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _stats = AdminStats.fromJson(cached);
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final stats = await _adminService.fetchStats();
       if (!mounted) return;
       setState(() {
         _stats = stats;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -57,6 +78,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         title: const Text('Admin Dashboard'),
         elevation: 0,
       ),
+      drawer: const AdminDrawer(),
       bottomNavigationBar: const AdminBottomNav(currentIndex: 0),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../courses/models/course_model.dart';
 import '../../courses/models/course_browse_model.dart';
 import '../../courses/models/course_content_model.dart';
@@ -13,13 +14,21 @@ class StudentCourseService {
   StudentCourseService(this._apiClient);
 
   Future<List<CourseBrowse>> fetchBrowseCourses() async {
+    const cacheKey = 'cache:student:browse_courses';
     try {
       final response = await _apiClient.get('/courses/browse');
       final list = response.data as List<dynamic>;
+      await CacheService.setJson(cacheKey, list);
       return list
           .map((json) => CourseBrowse.fromJson(json as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is List) {
+        return cached
+            .map((json) => CourseBrowse.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
       throw _handleError(e);
     }
   }
@@ -33,65 +42,107 @@ class StudentCourseService {
   }
 
   Future<List<EnrolledCourse>> fetchEnrolledCourses() async {
+    const cacheKey = 'cache:student:enrolled_courses';
     try {
       final response = await _apiClient.get('/courses/enrolled/me');
       final list = response.data as List<dynamic>;
+      await CacheService.setJson(cacheKey, list);
       return list
           .map((json) => EnrolledCourse.fromJson(json as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is List) {
+        return cached
+            .map((json) => EnrolledCourse.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
       throw _handleError(e);
     }
   }
 
   Future<Course> fetchCourseDetail(int courseId) async {
+    final cacheKey = 'cache:student:course_detail:$courseId';
     try {
       final response = await _apiClient.get('/courses/$courseId');
+      await CacheService.setJson(cacheKey, response.data);
       return Course.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is Map<String, dynamic>) {
+        return Course.fromJson(cached);
+      }
       throw _handleError(e);
     }
   }
 
   Future<List<CourseContent>> fetchCourseContent(int courseId) async {
+    final cacheKey = 'cache:student:course_content:$courseId';
     try {
       final response = await _apiClient.get('/courses/$courseId');
       final data = response.data as Map<String, dynamic>;
       final contents = data['contents'] as List<dynamic>? ?? [];
+      await CacheService.setJson(cacheKey, contents);
       return contents
           .map((json) => CourseContent.fromJson(json as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is List) {
+        return cached
+            .map((json) => CourseContent.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
       throw _handleError(e);
     }
   }
 
   Future<CourseProgress> fetchCourseProgress(int courseId) async {
+    final cacheKey = 'cache:student:course_progress:$courseId';
     try {
       final response = await _apiClient.get('/courses/$courseId/progress');
+      await CacheService.setJson(cacheKey, response.data);
       return CourseProgress.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is Map<String, dynamic>) {
+        return CourseProgress.fromJson(cached);
+      }
       throw _handleError(e);
     }
   }
 
   Future<List<ExamSummary>> fetchExamsByCourse(int courseId) async {
+    final cacheKey = 'cache:student:exams_by_course:$courseId';
     try {
       final response = await _apiClient.get('/exams/course/$courseId');
       final list = response.data as List<dynamic>;
+      await CacheService.setJson(cacheKey, list);
       return list
           .map((json) => ExamSummary.fromJson(json as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is List) {
+        return cached
+            .map((json) => ExamSummary.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
       throw _handleError(e);
     }
   }
 
   Future<ExamDetail> fetchExamDetail(int examId) async {
+    final cacheKey = 'cache:student:exam_detail:$examId';
     try {
       final response = await _apiClient.get('/exams/$examId');
+      await CacheService.setJson(cacheKey, response.data);
       return ExamDetail.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is Map<String, dynamic>) {
+        return ExamDetail.fromJson(cached);
+      }
       throw _handleError(e);
     }
   }
@@ -112,27 +163,41 @@ class StudentCourseService {
   }
 
   Future<ExamResult?> fetchMyExamResult(int examId) async {
+    final cacheKey = 'cache:student:exam_result:$examId';
     try {
       final response = await _apiClient.get('/exams/$examId/results');
       final list = response.data as List<dynamic>;
       if (list.isEmpty) return null;
+      await CacheService.setJson(cacheKey, list.first);
       return ExamResult.fromJson(list.first as Map<String, dynamic>);
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is Map<String, dynamic>) {
+        return ExamResult.fromJson(cached);
+      }
       throw _handleError(e);
     }
   }
 
   Future<List<StudentExamListItem>> fetchMyExams({int? courseId}) async {
+    final cacheKey = 'cache:student:my_exams:${courseId ?? 'all'}';
     try {
       final response = await _apiClient.get(
         '/exams/my',
         queryParameters: courseId != null ? {'course_id': courseId} : null,
       );
       final list = response.data as List<dynamic>;
+      await CacheService.setJson(cacheKey, list);
       return list
           .map((json) => StudentExamListItem.fromJson(json as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
+      final cached = await CacheService.getJson(cacheKey);
+      if (cached is List) {
+        return cached
+            .map((json) => StudentExamListItem.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
       throw _handleError(e);
     }
   }

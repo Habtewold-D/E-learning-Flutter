@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../courses/models/course_model.dart';
 import '../../courses/models/course_content_model.dart';
 import '../../courses/models/course_progress_model.dart';
@@ -34,10 +35,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Future<void> _loadCourseData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    var hadCache = false;
 
     final courseId = int.tryParse(widget.courseId);
     if (courseId == null) {
@@ -46,6 +44,46 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         _isLoading = false;
       });
       return;
+    }
+
+    final cachedCourse = await CacheService.getJson('cache:student:course_detail:$courseId');
+    final cachedContents = await CacheService.getJson('cache:student:course_content:$courseId');
+    final cachedProgress = await CacheService.getJson('cache:student:course_progress:$courseId');
+    final cachedExams = await CacheService.getJson('cache:student:exams_by_course:$courseId');
+
+    if (cachedCourse is Map<String, dynamic> ||
+        cachedContents is List ||
+        cachedProgress is Map<String, dynamic> ||
+        cachedExams is List) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        if (cachedCourse is Map<String, dynamic>) {
+          _course = Course.fromJson(cachedCourse);
+        }
+        if (cachedContents is List) {
+          _content = cachedContents
+              .map((json) => CourseContent.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+        if (cachedProgress is Map<String, dynamic>) {
+          _progress = CourseProgress.fromJson(cachedProgress);
+        }
+        if (cachedExams is List) {
+          _exams = cachedExams
+              .map((json) => ExamSummary.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
     }
 
     try {
@@ -62,12 +100,15 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         _progress = results[2] as CourseProgress;
         _exams = results[3] as List<ExamSummary>;
         _isLoading = false;
+        _error = null;
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

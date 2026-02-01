@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../exams/models/exam_model.dart';
 import '../services/course_service.dart';
@@ -39,10 +40,7 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
   }
 
   Future<void> _loadResult() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    var hadCache = false;
 
     final examId = int.tryParse(widget.examId);
     if (examId == null) {
@@ -53,19 +51,40 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
       return;
     }
 
+    final cached = await CacheService.getJson('cache:student:exam_result:$examId');
+    if (cached is Map<String, dynamic>) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _result = ExamResult.fromJson(cached);
+        _isLoading = false;
+        _error = null;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
     try {
       final result = await _courseService.fetchMyExamResult(examId);
       if (!mounted) return;
       setState(() {
         _result = result;
         _isLoading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 

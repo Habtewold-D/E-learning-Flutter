@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/teacher_drawer.dart';
 import '../../exams/models/exam_model.dart';
 import '../services/course_service.dart';
@@ -33,22 +34,43 @@ class _ExamSubmissionsScreenState extends State<ExamSubmissionsScreen> {
   }
 
   Future<void> _fetchSubmissions() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    var hadCache = false;
+    final cached = await CacheService.getJson('cache:teacher:exam_submissions:$_examId');
+    if (cached is List) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _submissions = cached
+            .map((json) => ExamSubmission.fromJson(json as Map<String, dynamic>))
+            .toList();
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final submissions = await _courseService.fetchExamSubmissions(_examId);
+      if (!mounted) return;
       setState(() {
         _submissions = submissions;
         _isLoading = false;
+        _error = null;
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (!mounted) return;
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

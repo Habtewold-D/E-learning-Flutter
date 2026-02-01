@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../exams/models/exam_model.dart';
 import '../services/course_service.dart';
@@ -40,10 +41,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   }
 
   Future<void> _loadExam() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    var hadCache = false;
 
     final examId = int.tryParse(widget.examId);
     if (examId == null) {
@@ -54,21 +52,44 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       return;
     }
 
+    final cached = await CacheService.getJson('cache:student:exam_detail:$examId');
+    if (cached is Map<String, dynamic>) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _exam = ExamDetail.fromJson(cached);
+        _isLoading = false;
+        _error = null;
+      });
+      _initializeTimer();
+      await _markInProgress(examId);
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
     try {
       final exam = await _courseService.fetchExamDetail(examId);
       if (!mounted) return;
       setState(() {
         _exam = exam;
         _isLoading = false;
+        _error = null;
       });
       await _markInProgress(examId);
       _initializeTimer();
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../exams/models/exam_model.dart';
 import '../services/course_service.dart';
@@ -30,10 +31,38 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
   }
 
   Future<void> _loadExams() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    final cacheKey = 'cache:student:my_exams:${widget.courseId ?? 'all'}';
+    var hadCache = false;
+
+    final cached = await CacheService.getJson(cacheKey);
+    if (cached is List) {
+      final exams = cached
+          .map((json) => StudentExamListItem.fromJson(json as Map<String, dynamic>))
+          .toList();
+      final prefs = await SharedPreferences.getInstance();
+      final inProgressIds = prefs.getStringList('in_progress_exams') ?? <String>[];
+      final updated = exams.map((exam) {
+        if (exam.status != 'completed' && inProgressIds.contains(exam.id.toString())) {
+          return exam.copyWith(status: 'in_progress');
+        }
+        return exam;
+      }).toList();
+
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _exams = updated;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final courseId = widget.courseId != null ? int.tryParse(widget.courseId!) : null;
@@ -50,13 +79,16 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
       setState(() {
         _exams = updated;
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      if (!hadCache) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     }
   }
 

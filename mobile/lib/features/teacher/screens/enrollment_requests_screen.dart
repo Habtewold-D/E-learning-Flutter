@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/teacher_drawer.dart';
 import '../models/enrollment_request_model.dart';
 import '../services/course_service.dart';
@@ -25,22 +26,43 @@ class _EnrollmentRequestsScreenState extends State<EnrollmentRequestsScreen> {
   }
 
   Future<void> _loadRequests() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    const cacheKey = 'cache:teacher:enrollment_requests';
+    var hadCache = false;
+
+    final cached = await CacheService.getJson(cacheKey);
+    if (cached is List) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _requests = cached
+            .map((json) => EnrollmentRequest.fromJson(json as Map<String, dynamic>))
+            .toList();
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final requests = await _courseService.fetchPendingEnrollmentRequests();
       if (!mounted) return;
       setState(() {
         _requests = requests;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/admin_bottom_nav.dart';
+import '../../../core/widgets/admin_drawer.dart';
 import '../models/admin_analytics_model.dart';
 import '../models/admin_trends_model.dart';
 import '../services/admin_service.dart';
@@ -29,10 +31,33 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   }
 
   Future<void> _loadAnalytics() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    final analyticsKey = 'cache:admin:analytics';
+    final trendsKey = 'cache:admin:trends:$_period';
+    var hadCache = false;
+
+    final cachedAnalytics = await CacheService.getJson(analyticsKey);
+    final cachedTrends = await CacheService.getJson(trendsKey);
+    if (cachedAnalytics is Map<String, dynamic> || cachedTrends is Map<String, dynamic>) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        if (cachedAnalytics is Map<String, dynamic>) {
+          _analytics = AdminAnalytics.fromJson(cachedAnalytics);
+        }
+        if (cachedTrends is Map<String, dynamic>) {
+          _trends = AdminTrends.fromJson(cachedTrends);
+        }
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final results = await Future.wait([
@@ -45,12 +70,15 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       setState(() {
         _analytics = analytics;
         _trends = trends;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -67,6 +95,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         title: const Text('Reports & Analytics'),
         elevation: 0,
       ),
+      drawer: const AdminDrawer(),
       bottomNavigationBar: const AdminBottomNav(currentIndex: 2),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

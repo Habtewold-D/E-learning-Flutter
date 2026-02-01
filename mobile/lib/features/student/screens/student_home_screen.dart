@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../courses/models/enrolled_course_model.dart';
@@ -31,10 +32,34 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    var hadCache = false;
+    final cachedCourses = await CacheService.getJson('cache:student:enrolled_courses');
+    final cachedExams = await CacheService.getJson('cache:student:my_exams:all');
+    if (cachedCourses is List || cachedExams is List) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        if (cachedCourses is List) {
+          _courses = cachedCourses
+              .map((json) => EnrolledCourse.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+        if (cachedExams is List) {
+          _exams = cachedExams
+              .map((json) => StudentExamListItem.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+        _errorMessage = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final results = await Future.wait([
@@ -47,13 +72,16 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         _courses = results[0] as List<EnrolledCourse>;
         _exams = results[1] as List<StudentExamListItem>;
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 

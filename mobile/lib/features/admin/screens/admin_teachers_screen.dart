@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/admin_bottom_nav.dart';
+import '../../../core/widgets/admin_drawer.dart';
 import '../../auth/models/user_model.dart';
 import '../services/admin_service.dart';
 
@@ -25,22 +27,43 @@ class _AdminTeachersScreenState extends State<AdminTeachersScreen> {
   }
 
   Future<void> _loadTeachers() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    const cacheKey = 'cache:admin:teachers';
+    var hadCache = false;
+
+    final cached = await CacheService.getJson(cacheKey);
+    if (cached is List) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _teachers = cached
+            .map((json) => User.fromJson(json as Map<String, dynamic>))
+            .toList();
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final teachers = await _adminService.fetchTeachers();
       if (!mounted) return;
       setState(() {
         _teachers = teachers;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -218,6 +241,7 @@ class _AdminTeachersScreenState extends State<AdminTeachersScreen> {
           ),
         ],
       ),
+      drawer: const AdminDrawer(),
       bottomNavigationBar: const AdminBottomNav(currentIndex: 1),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

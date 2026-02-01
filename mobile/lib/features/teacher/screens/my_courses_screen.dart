@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../courses/models/course_model.dart';
+import '../../courses/models/course_browse_model.dart';
 import '../services/course_service.dart';
 
 class MyCoursesScreen extends StatefulWidget {
@@ -40,10 +42,52 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   }
 
   Future<void> _fetchCourses() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    var hadCache = false;
+    final cachedCourses = await CacheService.getJson('cache:teacher:my_courses');
+    final cachedBrowse = await CacheService.getJson('cache:teacher:courses_with_enrollment');
+
+    if (cachedCourses is List) {
+      final courses = cachedCourses.map((json) => Course.fromJson(json)).toList();
+      final courseIds = courses.map((c) => c.id).toSet();
+
+      final studentsByCourse = <int, int>{};
+      final contentByCourse = <int, int>{};
+      if (cachedBrowse is List) {
+        for (final entry in cachedBrowse) {
+          final course = CourseBrowse.fromJson(entry as Map<String, dynamic>);
+          if (courseIds.contains(course.id)) {
+            studentsByCourse[course.id] = course.studentsCount;
+            contentByCourse[course.id] = course.contentCount;
+          }
+        }
+      }
+
+      final examsByCourse = <int, int>{};
+      for (final course in courses) {
+        final cachedExams = await CacheService.getJson('cache:teacher:exams_by_course:${course.id}');
+        if (cachedExams is List) {
+          examsByCourse[course.id] = cachedExams.length;
+        }
+      }
+
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _courses = courses;
+        _studentsByCourse = studentsByCourse;
+        _contentByCourse = contentByCourse;
+        _examsByCourse = examsByCourse;
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final courses = await _courseService.fetchMyCourses();
@@ -73,12 +117,15 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
         _contentByCourse = contentByCourse;
         _examsByCourse = examsByCourse;
         _isLoading = false;
+        _error = null;
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

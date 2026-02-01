@@ -5,6 +5,7 @@ import 'dart:async';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../services/live_class_service.dart';
 import '../services/course_service.dart';
 import '../models/live_class.dart';
@@ -54,6 +55,33 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
       _isLoading = true;
       _error = null;
     });
+    var hadCache = false;
+    final cachedLive = await CacheService.getJson('cache:teacher:live_classes');
+    final cachedCourses = await CacheService.getJson('cache:teacher:all_courses');
+
+    if (cachedLive is List || cachedCourses is List) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        if (cachedLive is List) {
+          _liveClasses = cachedLive
+              .map((json) => LiveClass.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+        if (cachedCourses is List) {
+          _courses = cachedCourses.map((json) => Course.fromJson(json)).toList();
+        }
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final results = await Future.wait([
@@ -65,12 +93,24 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
         _liveClasses = results[0] as List<LiveClass>;
         _courses = results[1] as List<Course>;
         _isLoading = false;
+        _error = null;
       });
+
+      await CacheService.setJson(
+        'cache:teacher:live_classes',
+        _liveClasses.map((e) => e.toJson()).toList(),
+      );
+      await CacheService.setJson(
+        'cache:teacher:all_courses',
+        _courses.map((e) => e.toJson()).toList(),
+      );
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

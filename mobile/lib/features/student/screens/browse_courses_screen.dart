@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
 import '../../courses/models/course_browse_model.dart';
@@ -30,10 +31,28 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
   }
 
   Future<void> _loadCourses() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    const cacheKey = 'cache:student:browse_courses';
+    var hadCache = false;
+
+    final cached = await CacheService.getJson(cacheKey);
+    if (cached is List) {
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _allCourses = cached
+            .map((json) => CourseBrowse.fromJson(json as Map<String, dynamic>))
+            .toList();
+        _errorMessage = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final courses = await _courseService.fetchBrowseCourses();
@@ -41,13 +60,16 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
       setState(() {
         _allCourses = courses;
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      if (!hadCache) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     }
   }
 

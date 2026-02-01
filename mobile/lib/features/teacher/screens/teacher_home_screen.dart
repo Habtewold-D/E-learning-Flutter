@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
 import '../../courses/models/course_model.dart';
@@ -33,15 +34,56 @@ class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    var hadCache = false;
+    final authState = ref.read(authProvider);
+    final userId = authState.user?.id;
+
+    final cachedCourses = await CacheService.getJson('cache:teacher:my_courses');
+    final cachedBrowse = await CacheService.getJson('cache:teacher:courses_with_enrollment');
+
+    if (cachedCourses is List) {
+      final courses = cachedCourses.map((json) => Course.fromJson(json)).toList();
+      final courseIds = courses.map((c) => c.id).toSet();
+
+      final studentsByCourse = <int, int>{};
+      if (cachedBrowse is List) {
+        final browseCourses = cachedBrowse
+            .map((json) => CourseBrowse.fromJson(json as Map<String, dynamic>))
+            .toList();
+        for (final course in browseCourses) {
+          if (courseIds.contains(course.id) && (userId == null || course.teacherId == userId)) {
+            studentsByCourse[course.id] = course.studentsCount;
+          }
+        }
+      }
+
+      var totalExams = 0;
+      for (final course in courses) {
+        final cachedExams = await CacheService.getJson('cache:teacher:exams_by_course:${course.id}');
+        if (cachedExams is List) {
+          totalExams += cachedExams.length;
+        }
+      }
+
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _courses = courses;
+        _studentsByCourse = studentsByCourse;
+        _totalExams = totalExams;
+        _errorMessage = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
-      final authState = ref.read(authProvider);
-      final userId = authState.user?.id;
-
       final courses = await _courseService.fetchMyCourses();
       final courseIds = courses.map((c) => c.id).toSet();
 
@@ -67,13 +109,16 @@ class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
         _studentsByCourse = studentsByCourse;
         _totalExams = totalExams;
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
 import '../../courses/models/course_model.dart';
@@ -29,10 +30,38 @@ class _ExamsManagementScreenState extends State<ExamsManagementScreen> {
   }
 
   Future<void> _fetchExamManagementData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    var hadCache = false;
+    final cachedCourses = await CacheService.getJson('cache:teacher:my_courses');
+    if (cachedCourses is List) {
+      final courses = cachedCourses.map((json) => Course.fromJson(json)).toList();
+      final examsByCourse = <int, List<ExamSummary>>{};
+      for (final course in courses) {
+        final cachedExams = await CacheService.getJson('cache:teacher:exams_by_course:${course.id}');
+        if (cachedExams is List) {
+          examsByCourse[course.id] = cachedExams
+              .map((json) => ExamSummary.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+      }
+
+      hadCache = true;
+      if (!mounted) return;
+      setState(() {
+        _courses = courses;
+        _examsByCourseId
+          ..clear()
+          ..addAll(examsByCourse);
+        _error = null;
+        _isLoading = false;
+      });
+    }
+
+    if (!hadCache && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final courses = await _courseService.fetchMyCourses();
@@ -51,12 +80,15 @@ class _ExamsManagementScreenState extends State<ExamsManagementScreen> {
           ..clear()
           ..addAll(examsByCourse);
         _isLoading = false;
+        _error = null;
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (!hadCache) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
