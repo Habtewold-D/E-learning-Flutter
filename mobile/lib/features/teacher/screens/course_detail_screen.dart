@@ -150,7 +150,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   ),
         bottomNavigationBar: const TeacherBottomNav(currentIndex: 1),
         floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
+          onPressed: () async {
+            final updated = await context.push('/teacher/courses/${widget.courseId}/upload-content');
+            if (updated == true) {
+              _loadCourseData();
+            }
+          },
           icon: const Icon(Icons.upload_file),
           label: const Text('Upload Content'),
         ),
@@ -314,7 +319,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                         ),
                   ),
                   ElevatedButton.icon(
-                    onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
+                    onPressed: () async {
+                      final updated =
+                          await context.push('/teacher/courses/${widget.courseId}/upload-content');
+                      if (updated == true) {
+                        _loadCourseData();
+                      }
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Add Content'),
                   ),
@@ -335,7 +346,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     ElevatedButton.icon(
-                      onPressed: () => context.push('/teacher/courses/${widget.courseId}/upload-content'),
+                      onPressed: () async {
+                        final updated =
+                            await context.push('/teacher/courses/${widget.courseId}/upload-content');
+                        if (updated == true) {
+                          _loadCourseData();
+                        }
+                      },
                       icon: const Icon(Icons.upload_file),
                       label: const Text('Upload First Content'),
                     ),

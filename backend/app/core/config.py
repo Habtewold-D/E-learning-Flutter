@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     # File Storage
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE_MB: int = 100
+
+    # Cloudinary
+    CLOUDINARY_CLOUD_NAME: Optional[str] = None
+    CLOUDINARY_API_KEY: Optional[str] = None
+    CLOUDINARY_API_SECRET: Optional[str] = None
     
     # Server
     HOST: str = "0.0.0.0"

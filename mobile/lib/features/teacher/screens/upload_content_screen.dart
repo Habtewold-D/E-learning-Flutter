@@ -295,29 +295,6 @@ class _UploadContentScreenState extends State<UploadContentScreen> {
                       ),
               ),
               const SizedBox(height: 16),
-
-              // Info Card
-              Card(
-                color: Colors.blue[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue[700]),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'PDF files will be automatically processed for AI question answering.',
-                          style: TextStyle(
-                            color: Colors.blue[900],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ],
           ),
         ),

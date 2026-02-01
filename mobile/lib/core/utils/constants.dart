@@ -15,7 +15,7 @@ class AppConstants {
   //
   // Make sure your backend is running with: uvicorn app.main:app --host 0.0.0.0 --port 8000
   // ============================================
-  static const String baseUrl = 'http://10.5.232.237:8000/api';
+  static const String baseUrl = 'http://192.168.8.9:8000/api';
   
   // Storage Keys
   static const String tokenKey = 'auth_token';
