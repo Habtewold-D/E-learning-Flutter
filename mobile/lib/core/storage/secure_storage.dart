@@ -37,6 +37,19 @@ class SecureStorage {
     await _storage.delete(key: AppConstants.userKey);
   }
 
+  // Push Token Management
+  static Future<void> savePushToken(String token) async {
+    await _storage.write(key: AppConstants.pushTokenKey, value: token);
+  }
+
+  static Future<String?> getPushToken() async {
+    return await _storage.read(key: AppConstants.pushTokenKey);
+  }
+
+  static Future<void> deletePushToken() async {
+    await _storage.delete(key: AppConstants.pushTokenKey);
+  }
+
   // Clear all data
   static Future<void> clearAll() async {
     await _storage.deleteAll();

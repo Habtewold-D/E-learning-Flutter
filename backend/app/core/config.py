@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     JAAS_APP_ID: Optional[str] = None
     JAAS_PRIVATE_KEY: Optional[str] = None
     JAAS_API_KEY: Optional[str] = None
+
+    # Firebase (FCM HTTP v1)
+    FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     
     class Config:
         env_file = ".env"

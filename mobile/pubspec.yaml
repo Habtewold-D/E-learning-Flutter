@@ -38,6 +38,8 @@ dependencies:
 
   # UI
   flutter_svg: ^2.0.9
+  firebase_core: ^2.32.0
+  firebase_messaging: ^14.9.4
   cached_network_image: ^3.3.0
   fl_chart: ^0.68.0
 

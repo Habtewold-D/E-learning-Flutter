@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/utils/constants.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../models/user_model.dart';
 import '../models/auth_models.dart';
 import 'dart:convert';
@@ -52,6 +53,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (userData != null) {
         final userJson = json.decode(userData) as Map<String, dynamic>;
         state = state.copyWith(user: User.fromJson(userJson));
+        await PushNotificationService.registerToken(_apiClient);
       }
     } catch (e) {
       // Ignore errors when loading from storage
@@ -75,6 +77,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Save token and user data
       await SecureStorage.saveToken(authResponse.accessToken);
       await SecureStorage.saveUserData(json.encode(authResponse.user.toJson()));
+
+      await PushNotificationService.registerToken(_apiClient);
 
       state = state.copyWith(
         user: authResponse.user,
@@ -154,6 +158,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Save token and user data
       await SecureStorage.saveToken(authResponse.accessToken);
       await SecureStorage.saveUserData(json.encode(authResponse.user.toJson()));
+
+      await PushNotificationService.registerToken(_apiClient);
 
       state = state.copyWith(
         user: authResponse.user,
@@ -236,6 +242,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // Logout
   Future<void> logout() async {
+    await PushNotificationService.unregisterToken(_apiClient);
     await SecureStorage.clearAll();
     state = AuthState();
   }

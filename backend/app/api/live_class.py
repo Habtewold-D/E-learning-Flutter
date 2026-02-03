@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.user import User, UserRole
+from app.models.course import Course, Enrollment, EnrollmentStatus
 from app.api.dependencies import get_current_user
 from app.schemas.live_class import LiveClassCreate, LiveClassUpdate, LiveClassResponse
 from app.core.config import settings
@@ -13,6 +14,7 @@ from app.services.live_class_service import (
     update_live_class,
     refresh_live_class_status,
 )
+from app.services.notification_service import notify_users
 from app.models.live_class import LiveClassStatus
 from datetime import datetime, timedelta
 import time
@@ -28,7 +30,32 @@ def schedule_live_class(
 ):
     if current_user.role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="Only teachers can schedule live classes")
-    return create_live_class(db, teacher_id=current_user.id, data=data)
+    live_class = create_live_class(db, teacher_id=current_user.id, data=data)
+
+    try:
+        course = db.query(Course).filter(Course.id == data.course_id).first()
+        approved_students = (
+            db.query(Enrollment)
+            .filter(Enrollment.course_id == data.course_id)
+            .filter(Enrollment.status == EnrollmentStatus.APPROVED)
+            .all()
+        )
+        student_ids = [e.student_id for e in approved_students]
+        notify_users(
+            db=db,
+            user_ids=student_ids,
+            title="Live class scheduled",
+            body=f"{course.title if course else 'Course'}: {live_class.title}",
+            data={
+                "type": "live_class_scheduled",
+                "course_id": str(data.course_id),
+                "live_class_id": str(live_class.id),
+            },
+        )
+    except Exception:
+        pass
+
+    return live_class
 @router.get("/{live_class_id}/join", response_model=LiveClassResponse)
 def join_live_class(
     live_class_id: int,

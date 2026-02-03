@@ -23,6 +23,7 @@ from app.api.dependencies import get_current_user
 from app.services.file_service import save_uploaded_file
 import os
 from app.core.config import settings
+from app.services.notification_service import notify_users
 
 router = APIRouter()
 
@@ -234,6 +235,28 @@ async def upload_content(
     db.add(new_content)
     db.commit()
     db.refresh(new_content)
+
+    try:
+        approved_students = (
+            db.query(Enrollment)
+            .filter(Enrollment.course_id == course_id)
+            .filter(Enrollment.status == EnrollmentStatus.APPROVED)
+            .all()
+        )
+        student_ids = [e.student_id for e in approved_students]
+        notify_users(
+            db=db,
+            user_ids=student_ids,
+            title="New course content",
+            body=f"New content added in {course.title}: {title}",
+            data={
+                "type": "course_content",
+                "course_id": str(course_id),
+                "content_id": str(new_content.id),
+            },
+        )
+    except Exception:
+        pass
     
     return ContentResponse.model_validate(new_content)
 
@@ -260,6 +283,20 @@ async def enroll_in_course(
             existing.status = EnrollmentStatus.PENDING
             db.commit()
             db.refresh(existing)
+            try:
+                notify_users(
+                    db=db,
+                    user_ids=[course.teacher_id],
+                    title="New enrollment request",
+                    body=f"{current_user.name} requested to join {course.title}",
+                    data={
+                        "type": "enrollment_request",
+                        "course_id": str(course_id),
+                        "student_id": str(current_user.id),
+                    },
+                )
+            except Exception:
+                pass
         return EnrollmentResponse(
             course_id=course_id,
             student_id=current_user.id,
@@ -275,6 +312,20 @@ async def enroll_in_course(
     db.add(enrollment)
     db.commit()
     db.refresh(enrollment)
+    try:
+        notify_users(
+            db=db,
+            user_ids=[course.teacher_id],
+            title="New enrollment request",
+            body=f"{current_user.name} requested to join {course.title}",
+            data={
+                "type": "enrollment_request",
+                "course_id": str(course_id),
+                "student_id": str(current_user.id),
+            },
+        )
+    except Exception:
+        pass
     return EnrollmentResponse(
         course_id=course_id,
         student_id=current_user.id,
@@ -409,6 +460,19 @@ async def approve_enrollment_request(
     enrollment.status = EnrollmentStatus.APPROVED
     db.commit()
     db.refresh(enrollment)
+    try:
+        notify_users(
+            db=db,
+            user_ids=[enrollment.student_id],
+            title="Enrollment approved",
+            body=f"You have been approved to join {enrollment.course.title}",
+            data={
+                "type": "enrollment_approved",
+                "course_id": str(enrollment.course_id),
+            },
+        )
+    except Exception:
+        pass
     return EnrollmentRequestResponse(
         id=enrollment.id,
         course_id=enrollment.course_id,
@@ -443,6 +507,19 @@ async def reject_enrollment_request(
     enrollment.status = EnrollmentStatus.REJECTED
     db.commit()
     db.refresh(enrollment)
+    try:
+        notify_users(
+            db=db,
+            user_ids=[enrollment.student_id],
+            title="Enrollment rejected",
+            body=f"Your enrollment request for {enrollment.course.title} was rejected",
+            data={
+                "type": "enrollment_rejected",
+                "course_id": str(enrollment.course_id),
+            },
+        )
+    except Exception:
+        pass
     return EnrollmentRequestResponse(
         id=enrollment.id,
         course_id=enrollment.course_id,

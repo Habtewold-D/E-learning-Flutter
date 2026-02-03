@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
 from app.models.user import User, UserRole
-from app.models.course import Course, Enrollment
+from app.models.course import Course, Enrollment, EnrollmentStatus
 from app.models.exam import Exam, Question, Result
 from app.schemas.exam import ExamCreate, ExamResponse, ExamSubmit, ResultResponse, QuestionResponse, ResultWithStudentResponse, QuestionCreate, QuestionUpdate, ExamUpdate, StudentExamListResponse
 from app.api.dependencies import get_current_user
+from app.services.notification_service import notify_users
 
 router = APIRouter()
 
@@ -52,6 +53,28 @@ async def create_exam(
     
     db.commit()
     db.refresh(new_exam)
+
+    try:
+        approved_students = (
+            db.query(Enrollment)
+            .filter(Enrollment.course_id == new_exam.course_id)
+            .filter(Enrollment.status == EnrollmentStatus.APPROVED)
+            .all()
+        )
+        student_ids = [e.student_id for e in approved_students]
+        notify_users(
+            db=db,
+            user_ids=student_ids,
+            title="New exam available",
+            body=f"{course.title}: {new_exam.title}",
+            data={
+                "type": "exam_created",
+                "course_id": str(new_exam.course_id),
+                "exam_id": str(new_exam.id),
+            },
+        )
+    except Exception:
+        pass
     
     return ExamResponse(
         id=new_exam.id,

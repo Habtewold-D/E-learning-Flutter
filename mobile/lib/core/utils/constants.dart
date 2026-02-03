@@ -20,6 +20,7 @@ class AppConstants {
   // Storage Keys
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_data';
+  static const String pushTokenKey = 'push_token';
   
   // API Endpoints
   static const String authRegister = '/auth/register';
@@ -33,6 +34,8 @@ class AppConstants {
   static const String exams = '/exams';
   static const String examSubmit = '/exams/{exam_id}/submit';
   static const String examResults = '/exams/{exam_id}/results';
+
+  static const String notificationTokens = '/notifications/tokens';
 
   // JaaS live class token is served by backend
   

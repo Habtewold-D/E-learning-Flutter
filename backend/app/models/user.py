@@ -25,4 +25,10 @@ class User(Base):
     live_classes = relationship("LiveClass", back_populates="teacher")
     enrollments = relationship("Enrollment", back_populates="student")
     content_progress = relationship("ContentProgress", back_populates="student")
+    notification_tokens = relationship("NotificationToken", back_populates="user", cascade="all, delete-orphan",)
+    in_app_notifications = relationship(
+        "InAppNotification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 

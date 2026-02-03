@@ -110,12 +110,14 @@ class ApiClient {
   // DELETE request
   Future<Response> delete(
     String path, {
+    dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
     try {
       return await _dio.delete(
         path,
+        data: data,
         queryParameters: queryParameters,
         options: options,
       );

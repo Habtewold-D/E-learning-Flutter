@@ -25,5 +25,9 @@ aiofiles==23.2.1
 python-magic==0.4.27
 cloudinary==1.39.0
 
+# Firebase FCM HTTP v1
+google-auth==2.27.0
+requests==2.31.0
+
 # CORS is built into FastAPI
 
