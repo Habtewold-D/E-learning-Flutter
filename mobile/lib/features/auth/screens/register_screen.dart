@@ -20,7 +20,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  String _selectedRole = 'student'; // Default to student
 
   @override
   void dispose() {
@@ -49,7 +48,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           email,
           password,
           name,
-          _selectedRole,
+          'student',
         );
 
     if (user != null) {
@@ -167,36 +166,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         return 'Please enter a valid email';
                       }
                       return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Role Selection
-                  DropdownButtonFormField<String>(
-                    value: _selectedRole,
-                    decoration: InputDecoration(
-                      labelText: 'I am a',
-                      prefixIcon: const Icon(Icons.work_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'student',
-                        child: Text('Student'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'teacher',
-                        child: Text('Teacher'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _selectedRole = value;
-                        });
-                      }
                     },
                   ),
                   const SizedBox(height: 16),
