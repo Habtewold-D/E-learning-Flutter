@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Literal
 from datetime import datetime
 
 
@@ -30,6 +30,9 @@ class NotificationSendRequest(BaseModel):
     data: Optional[Dict[str, str]] = None
     user_id: Optional[int] = None
     tokens: Optional[List[str]] = None
+    target_role: Optional[Literal["teacher", "student", "all"]] = None
+    send_push: bool = True
+    send_in_app: bool = True
 
 
 class NotificationSendResponse(BaseModel):

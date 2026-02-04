@@ -25,6 +25,9 @@ class AdminBottomNav extends StatelessWidget {
           case 2:
             context.go('/admin/reports');
             break;
+          case 3:
+            context.go('/admin/notifications');
+            break;
         }
       },
       items: const [
@@ -39,6 +42,10 @@ class AdminBottomNav extends StatelessWidget {
         BottomNavigationBarItem(
           icon: Icon(Icons.analytics),
           label: 'Reports',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.notifications),
+          label: 'Notify',
         ),
       ],
     );

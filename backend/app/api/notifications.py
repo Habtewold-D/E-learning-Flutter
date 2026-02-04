@@ -95,41 +95,46 @@ def send_notification(
     _require_admin(current_user)
 
     tokens: List[str] = []
+    user_ids = set()
     if payload.tokens:
         tokens.extend(payload.tokens)
 
     if payload.user_id is not None:
+        user_ids.add(payload.user_id)
+
+    if payload.target_role:
+        if payload.target_role == "all":
+            role_users = db.query(User).all()
+        elif payload.target_role == "teacher":
+            role_users = db.query(User).filter(User.role == UserRole.TEACHER).all()
+        else:
+            role_users = db.query(User).filter(User.role == UserRole.STUDENT).all()
+        user_ids.update([u.id for u in role_users])
+
+    if user_ids:
         user_tokens = (
             db.query(NotificationToken)
-            .filter(NotificationToken.user_id == payload.user_id)
+            .filter(NotificationToken.user_id.in_(list(user_ids)))
             .all()
         )
         tokens.extend([t.token for t in user_tokens])
 
     tokens = list(dict.fromkeys(tokens))
-    if not tokens:
+    if not tokens and not payload.send_in_app:
         return NotificationSendResponse(success_count=0, failure_count=0, errors=None)
 
     try:
-        user_ids = set()
-        if payload.user_id is not None:
-            user_ids.add(payload.user_id)
-        if payload.tokens:
-            token_users = (
-                db.query(NotificationToken)
-                .filter(NotificationToken.token.in_(payload.tokens))
-                .all()
+        result = {"success_count": 0, "failure_count": 0, "errors": None}
+
+        if payload.send_push and tokens:
+            result = send_fcm_multicast(
+                tokens=tokens,
+                title=payload.title,
+                body=payload.body,
+                data=payload.data,
             )
-            user_ids.update([t.user_id for t in token_users])
 
-        result = send_fcm_multicast(
-            tokens=tokens,
-            title=payload.title,
-            body=payload.body,
-            data=payload.data,
-        )
-
-        if user_ids:
+        if payload.send_in_app and user_ids:
             data_json = json.dumps(payload.data) if payload.data else None
             for user_id in user_ids:
                 db.add(

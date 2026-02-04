@@ -35,6 +35,7 @@ import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/admin/screens/admin_home_screen.dart';
 import '../../features/admin/screens/admin_teachers_screen.dart';
 import '../../features/admin/screens/admin_reports_screen.dart';
+import '../../features/admin/screens/admin_notifications_screen.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -173,6 +174,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/admin/reports',
         name: 'admin-reports',
         builder: (context, state) => const AdminReportsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/notifications',
+        name: 'admin-notifications',
+        builder: (context, state) => const AdminNotificationsScreen(),
       ),
       GoRoute(
         path: '/teacher/courses',
