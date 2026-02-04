@@ -7,6 +7,7 @@ from app.services.live_class_service import _auto_update_statuses
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api import auth, courses, exams, live, live_class, admin, notifications
+from pathlib import Path
 
 app = FastAPI(
     title="E-Learning Platform API",
@@ -15,6 +16,7 @@ app = FastAPI(
 )
 
 # Serve uploaded files
+Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 # CORS Configuration
