@@ -26,6 +26,20 @@ def _require_admin(current_user: User) -> None:
         raise HTTPException(status_code=403, detail="Admin access required")
 
 
+def _notification_to_response(notification: InAppNotification) -> InAppNotificationResponse:
+    data = json.loads(notification.data) if notification.data else None
+    return InAppNotificationResponse(
+        id=notification.id,
+        user_id=notification.user_id,
+        title=notification.title,
+        body=notification.body,
+        data=data,
+        is_read=notification.is_read,
+        created_at=notification.created_at,
+        updated_at=notification.updated_at,
+    )
+
+
 @router.post("/tokens", response_model=NotificationTokenResponse)
 def register_token(
     payload: NotificationTokenCreate,
@@ -154,9 +168,7 @@ def create_inapp_notification(
     db.commit()
     db.refresh(notification)
 
-    response = InAppNotificationResponse.model_validate(notification)
-    response.data = payload.data
-    return response
+    return _notification_to_response(notification)
 
 
 @router.get("/inapp", response_model=List[InAppNotificationResponse])
@@ -171,13 +183,22 @@ def list_inapp_notifications(
         .all()
     )
 
-    results: List[InAppNotificationResponse] = []
-    for item in notifications:
-        data = json.loads(item.data) if item.data else None
-        response = InAppNotificationResponse.model_validate(item)
-        response.data = data
-        results.append(response)
-    return results
+    return [_notification_to_response(item) for item in notifications]
+
+
+@router.patch("/inapp/read-all")
+def mark_all_inapp_read(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    (
+        db.query(InAppNotification)
+        .filter(InAppNotification.user_id == current_user.id)
+        .filter(InAppNotification.is_read == False)  # noqa: E712
+        .update({InAppNotification.is_read: True}, synchronize_session=False)
+    )
+    db.commit()
+    return {"message": "All notifications marked as read"}
 
 
 @router.patch("/inapp/{notification_id}", response_model=InAppNotificationResponse)
@@ -200,7 +221,24 @@ def update_inapp_notification(
     db.commit()
     db.refresh(notification)
 
-    data = json.loads(notification.data) if notification.data else None
-    response = InAppNotificationResponse.model_validate(notification)
-    response.data = data
-    return response
+    return _notification_to_response(notification)
+
+
+@router.delete("/inapp/{notification_id}")
+def delete_inapp_notification(
+    notification_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    notification = (
+        db.query(InAppNotification)
+        .filter(InAppNotification.id == notification_id)
+        .filter(InAppNotification.user_id == current_user.id)
+        .first()
+    )
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    db.delete(notification)
+    db.commit()
+    return {"message": "Notification deleted"}

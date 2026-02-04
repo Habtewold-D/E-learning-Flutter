@@ -31,9 +31,12 @@ import '../../features/teacher/screens/live_classes_screen.dart';
 import '../../features/teacher/screens/live_class_join_screen.dart';
 import '../../features/teacher/screens/teacher_profile_screen.dart';
 import '../../features/teacher/screens/enrollment_requests_screen.dart';
+import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/admin/screens/admin_home_screen.dart';
 import '../../features/admin/screens/admin_teachers_screen.dart';
 import '../../features/admin/screens/admin_reports_screen.dart';
+
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Watch auth state to trigger router rebuilds
@@ -45,6 +48,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
     refreshListenable: refreshNotifier,
+    observers: [routeObserver],
     redirect: (context, state) {
       final currentAuthState = ref.read(authProvider);
       final isAuthenticated = currentAuthState.isAuthenticated;
@@ -257,6 +261,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'teacher-profile',
         builder: (context, state) => const TeacherProfileScreen(),
       ),
+      GoRoute(
+        path: '/teacher/notifications',
+        name: 'teacher-notifications',
+        builder: (context, state) => const NotificationsScreen(isTeacher: true),
+      ),
 
       // Student Routes
       GoRoute(
@@ -368,6 +377,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/student/profile',
         name: 'student-profile',
         builder: (context, state) => const StudentProfileScreen(),
+      ),
+      GoRoute(
+        path: '/student/notifications',
+        name: 'student-notifications',
+        builder: (context, state) => const NotificationsScreen(isTeacher: false),
       ),
 
       // Legacy Routes (will be implemented later)

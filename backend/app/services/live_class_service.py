@@ -62,13 +62,20 @@ def _auto_update_statuses(db: Session) -> None:
         db.commit()
 
 
-def list_live_classes(db: Session, course_id: Optional[int] = None, status: Optional[str] = None) -> List[LiveClass]:
+def list_live_classes(
+    db: Session,
+    course_id: Optional[int] = None,
+    status: Optional[str] = None,
+    teacher_id: Optional[int] = None,
+) -> List[LiveClass]:
     _auto_update_statuses(db)
     query = db.query(LiveClass)
     if course_id:
         query = query.filter(LiveClass.course_id == course_id)
     if status:
         query = query.filter(LiveClass.status == status)
+    if teacher_id:
+        query = query.filter(LiveClass.teacher_id == teacher_id)
     return query.order_by(LiveClass.scheduled_time.desc()).all()
 
 def update_live_class(db: Session, live_class_id: int, data: LiveClassUpdate) -> Optional[LiveClass]:

@@ -90,7 +90,8 @@ def get_live_classes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return list_live_classes(db, course_id=course_id, status=status)
+    teacher_id = current_user.id if current_user.role == UserRole.TEACHER else None
+    return list_live_classes(db, course_id=course_id, status=status, teacher_id=teacher_id)
 
 @router.get("/{live_class_id}", response_model=LiveClassResponse)
 def get_live_class_detail(

@@ -6,6 +6,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../courses/models/course_model.dart';
 import '../../courses/models/course_browse_model.dart';
 import '../../exams/models/exam_model.dart';
@@ -128,6 +129,9 @@ class _TeacherHomeScreenState extends ConsumerState<TeacherHomeScreen> {
       appBar: AppBar(
         title: const Text('Dashboard'),
         elevation: 0,
+        actions: const [
+          NotificationBell(isTeacher: true),
+        ],
       ),
       drawer: const TeacherDrawer(),
       body: RefreshIndicator(

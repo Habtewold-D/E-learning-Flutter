@@ -671,7 +671,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               Navigator.pop(context);
               context.pop();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$courseTitle deleted (mock)')),
+                SnackBar(
+                  content: Text('$courseTitle deleted (mock)'),
+                  backgroundColor: Colors.green,
+                ),
               );
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),

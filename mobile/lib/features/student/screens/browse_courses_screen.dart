@@ -4,6 +4,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../courses/models/course_browse_model.dart';
 import '../services/course_service.dart';
 
@@ -96,6 +97,9 @@ class _BrowseCoursesScreenState extends State<BrowseCoursesScreen> {
       appBar: AppBar(
         title: const Text('Browse Courses'),
         elevation: 0,
+        actions: const [
+          NotificationBell(isTeacher: false),
+        ],
       ),
       drawer: const StudentDrawer(),
       body: Column(

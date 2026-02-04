@@ -6,6 +6,7 @@ import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/storage/cache_service.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../services/live_class_service.dart';
 import '../services/course_service.dart';
 import '../models/live_class.dart';
@@ -57,7 +58,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
     });
     var hadCache = false;
     final cachedLive = await CacheService.getJson('cache:teacher:live_classes');
-    final cachedCourses = await CacheService.getJson('cache:teacher:all_courses');
+    final cachedCourses = await CacheService.getJson('cache:teacher:my_courses');
 
     if (cachedLive is List || cachedCourses is List) {
       hadCache = true;
@@ -86,7 +87,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
     try {
       final results = await Future.wait([
         _liveClassService.fetchLiveClasses(),
-        _courseService.fetchCourses(),
+        _courseService.fetchMyCourses(),
       ]);
 
       setState(() {
@@ -101,7 +102,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
         _liveClasses.map((e) => e.toJson()).toList(),
       );
       await CacheService.setJson(
-        'cache:teacher:all_courses',
+        'cache:teacher:my_courses',
         _courses.map((e) => e.toJson()).toList(),
       );
     } catch (e) {
@@ -134,11 +135,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
         title: const Text('Live Classes'),
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showCreateClassDialog(context),
-            tooltip: 'Create Live Class',
-          ),
+          const NotificationBell(isTeacher: true),
         ],
       ),
       drawer: const TeacherDrawer(),
@@ -531,7 +528,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Live class "${title}" created successfully'),
-          backgroundColor: Colors.lightBlue,
+          backgroundColor: Colors.green,
         ),
       );
 

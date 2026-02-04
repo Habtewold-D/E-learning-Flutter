@@ -53,7 +53,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Course created successfully!'),
-            backgroundColor: Colors.lightBlue,
+            backgroundColor: Colors.green,
           ),
         );
 

@@ -15,7 +15,7 @@ class AppConstants {
   //
   // Make sure your backend is running with: uvicorn app.main:app --host 0.0.0.0 --port 8000
   // ============================================
-  static const String baseUrl = 'http://192.168.8.9:8000/api';
+  static const String baseUrl = 'http://10.5.232.103:8000/api';
   
   // Storage Keys
   static const String tokenKey = 'auth_token';
@@ -36,6 +36,7 @@ class AppConstants {
   static const String examResults = '/exams/{exam_id}/results';
 
   static const String notificationTokens = '/notifications/tokens';
+  static const String notificationsInApp = '/notifications/inapp';
 
   // JaaS live class token is served by backend
   

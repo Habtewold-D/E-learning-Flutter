@@ -130,6 +130,15 @@ class TeacherDrawer extends ConsumerWidget {
               context.pushNamed('teacher-requests');
             },
           ),
+          _buildDrawerItem(
+            context,
+            icon: Icons.notifications,
+            title: 'Notifications',
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/teacher/notifications');
+            },
+          ),
           const Divider(),
           _buildDrawerItem(
             context,

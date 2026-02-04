@@ -76,12 +76,18 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
               if (updated != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Profile updated')),
+                  const SnackBar(
+                    content: Text('Profile updated'),
+                    backgroundColor: Colors.green,
+                  ),
                 );
                 Navigator.of(context).pop();
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(ref.read(authProvider).error ?? 'Failed to update profile')),
+                  SnackBar(
+                    content: Text(ref.read(authProvider).error ?? 'Failed to update profile'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
                 Navigator.of(context).pop();
               }
@@ -177,12 +183,18 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
               if (success) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password updated')),
+                  const SnackBar(
+                    content: Text('Password updated'),
+                    backgroundColor: Colors.green,
+                  ),
                 );
                 Navigator.of(context).pop();
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(ref.read(authProvider).error ?? 'Failed to update password')),
+                  SnackBar(
+                    content: Text(ref.read(authProvider).error ?? 'Failed to update password'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
                 Navigator.of(context).pop();
               }

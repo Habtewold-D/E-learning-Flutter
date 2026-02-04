@@ -6,6 +6,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../courses/models/enrolled_course_model.dart';
 import '../../exams/models/exam_model.dart';
 import '../services/course_service.dart';
@@ -94,6 +95,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       appBar: AppBar(
         title: const Text('Dashboard'),
         elevation: 0,
+        actions: const [
+          NotificationBell(isTeacher: false),
+        ],
       ),
       drawer: const StudentDrawer(),
       body: RefreshIndicator(

@@ -117,6 +117,15 @@ class StudentDrawer extends ConsumerWidget {
               context.go('/student/live');
             },
           ),
+          _buildDrawerItem(
+            context,
+            icon: Icons.notifications,
+            title: 'Notifications',
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/student/notifications');
+            },
+          ),
           const Divider(),
           _buildDrawerItem(
             context,

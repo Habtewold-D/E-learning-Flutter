@@ -232,7 +232,7 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
         break;
       case 'completed':
         statusColor = Colors.green;
-        statusText = 'Completed';
+        statusText = 'Submitted';
         statusIcon = Icons.check_circle;
         break;
       default:
@@ -305,6 +305,13 @@ class _ExamsListScreenState extends State<ExamsListScreen> {
                   ),
                 ],
               ),
+              if (status == 'completed') ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Already submitted. You can only view the results.',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [

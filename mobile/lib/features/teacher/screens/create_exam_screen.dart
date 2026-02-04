@@ -195,7 +195,7 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Exam created successfully!'),
-            backgroundColor: Colors.lightBlue,
+            backgroundColor: Colors.green,
           ),
         );
         context.pop();

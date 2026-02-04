@@ -356,6 +356,23 @@ async def submit_exam(
     db.add(result)
     db.commit()
     db.refresh(result)
+
+    try:
+        teacher_id = exam.course.teacher_id if exam.course else None
+        if teacher_id:
+            notify_users(
+                db=db,
+                user_ids=[teacher_id],
+                title="Exam submitted",
+                body=f"{current_user.name} submitted {exam.title}",
+                data={
+                    "type": "exam_submitted",
+                    "exam_id": str(exam.id),
+                    "student_id": str(current_user.id),
+                },
+            )
+    except Exception:
+        pass
     
     return ResultResponse.model_validate(result)
 

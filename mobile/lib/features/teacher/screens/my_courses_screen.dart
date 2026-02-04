@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
 import '../../../core/widgets/teacher_drawer.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/storage/cache_service.dart';
 import '../../courses/models/course_model.dart';
@@ -143,6 +144,9 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       appBar: AppBar(
         title: const Text('My Courses'),
         elevation: 0,
+        actions: const [
+          NotificationBell(isTeacher: true),
+        ],
       ),
       drawer: const TeacherDrawer(),
       body: Column(

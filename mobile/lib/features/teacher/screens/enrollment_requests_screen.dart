@@ -82,7 +82,7 @@ class _EnrollmentRequestsScreenState extends State<EnrollmentRequestsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Approved ${request.studentName} for ${request.courseTitle}'),
-          backgroundColor: Colors.lightBlue,
+          backgroundColor: Colors.green,
         ),
       );
     } catch (e) {

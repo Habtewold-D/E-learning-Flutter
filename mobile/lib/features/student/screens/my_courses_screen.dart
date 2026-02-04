@@ -4,6 +4,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/student_bottom_nav.dart';
 import '../../../core/widgets/student_drawer.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../courses/models/enrolled_course_model.dart';
 import '../services/course_service.dart';
 
@@ -83,6 +84,9 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
       appBar: AppBar(
         title: const Text('My Courses'),
         elevation: 0,
+        actions: const [
+          NotificationBell(isTeacher: false),
+        ],
       ),
       drawer: const StudentDrawer(),
       body: Column(

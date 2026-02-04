@@ -238,12 +238,18 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     final currentQuestion = questions[_currentQuestionIndex];
     final isLastQuestion = _currentQuestionIndex == questions.length - 1;
 
-    final options = [
+    final rawOptions = [
       currentQuestion.optionA,
       currentQuestion.optionB,
       currentQuestion.optionC,
       currentQuestion.optionD,
     ].where((value) => value.isNotEmpty).toList();
+
+    final isTrueFalse = rawOptions.length == 4 &&
+        rawOptions[0].toLowerCase() == rawOptions[2].toLowerCase() &&
+        rawOptions[1].toLowerCase() == rawOptions[3].toLowerCase();
+
+    final options = isTrueFalse ? rawOptions.take(2).toList() : rawOptions;
 
     return Scaffold(
       appBar: AppBar(
@@ -287,31 +293,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                 ),
-                TextButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Submit Exam?'),
-                        content: const Text('Are you sure you want to submit your exam?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _submitExam();
-                            },
-                            child: const Text('Submit'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: const Text('Submit'),
-                ),
+                const SizedBox.shrink(),
               ],
             ),
           ),
@@ -389,10 +371,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Theme.of(context).shadowColor.withOpacity(0.1),
                   blurRadius: 4,
                   offset: const Offset(0, -2),
                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/storage/cache_service.dart';
 import '../../../core/widgets/teacher_bottom_nav.dart';
@@ -15,7 +16,7 @@ class ExamsManagementScreen extends StatefulWidget {
   State<ExamsManagementScreen> createState() => _ExamsManagementScreenState();
 }
 
-class _ExamsManagementScreenState extends State<ExamsManagementScreen> {
+class _ExamsManagementScreenState extends State<ExamsManagementScreen> with RouteAware {
   late final CourseService _courseService;
   List<Course> _courses = [];
   final Map<int, List<ExamSummary>> _examsByCourseId = {};
@@ -26,6 +27,26 @@ class _ExamsManagementScreenState extends State<ExamsManagementScreen> {
   void initState() {
     super.initState();
     _courseService = CourseService(ApiClient());
+    _fetchExamManagementData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
     _fetchExamManagementData();
   }
 
