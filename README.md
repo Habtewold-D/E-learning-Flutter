@@ -98,15 +98,6 @@ flutter pub get
 flutter run
 ```
 
-## 📅 Development Timeline (1 Week)
-
-- **Day 1**: Project setup + Authentication
-- **Day 2**: Course management + File uploads
-- **Day 3**: Exam system + Auto-grading
-- **Day 4**: Live class integration
-- **Day 5**: Integration + UI polish
-- **Day 6**: Testing + Documentation
-
 ## 🔑 Environment Variables
 
 ### Backend (.env)

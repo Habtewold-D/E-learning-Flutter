@@ -92,8 +92,6 @@ async def change_password(
     except Exception:
         is_correct = False
 
-    # Debug log for verification result (do not log raw passwords)
-    print(f"change-password: user={current_user.id} verify_current_password={is_correct}")
 
     if not is_correct:
         raise HTTPException(status_code=400, detail="Current password is incorrect")

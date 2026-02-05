@@ -45,10 +45,7 @@ def decode_access_token(token: str) -> Optional[dict]:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
     except JWTError as e:
-        # Log the error for debugging (remove in production)
-        print(f"JWT Error: {e}")
         return None
     except Exception as e:
-        print(f"Token decode error: {e}")
         return None
 
