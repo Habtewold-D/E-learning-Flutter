@@ -2,16 +2,25 @@ from sqlalchemy.orm import Session
 from app.models.live_class import LiveClass, LiveClassStatus
 from app.schemas.live_class import LiveClassCreate, LiveClassUpdate
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 
 # CRUD operations for LiveClass
 
+def _to_utc_naive(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def create_live_class(db: Session, teacher_id: int, data: LiveClassCreate) -> LiveClass:
     room_name = f"course-{data.course_id}-{secrets.token_urlsafe(8)}"
-    now = datetime.now()
+    now = datetime.utcnow()
+    scheduled_time = _to_utc_naive(data.scheduled_time)
     # If no scheduled_time or scheduled_time is now/past, start immediately
-    start_immediately = data.scheduled_time is None or data.scheduled_time <= now
+    start_immediately = scheduled_time is None or scheduled_time <= now
 
     live_class = LiveClass(
         title=data.title,
@@ -19,7 +28,7 @@ def create_live_class(db: Session, teacher_id: int, data: LiveClassCreate) -> Li
         teacher_id=teacher_id,
         room_name=room_name,
         status=LiveClassStatus.ACTIVE if start_immediately else LiveClassStatus.SCHEDULED,
-        scheduled_time=data.scheduled_time,
+        scheduled_time=scheduled_time,
         started_at=now if start_immediately else None,
     )
     db.add(live_class)
@@ -32,7 +41,7 @@ def get_live_class(db: Session, live_class_id: int) -> Optional[LiveClass]:
 
 def _auto_update_statuses(db: Session) -> None:
     """Promote scheduled → active at scheduled_time, and active → ended after 1 hour."""
-    now = datetime.now()
+    now = datetime.utcnow()
     changed = False
 
     # Scheduled to active when time arrives (or scheduled_time missing but created)
@@ -82,7 +91,14 @@ def update_live_class(db: Session, live_class_id: int, data: LiveClassUpdate) ->
     live_class = get_live_class(db, live_class_id)
     if not live_class:
         return None
-    for field, value in data.dict(exclude_unset=True).items():
+    updates = data.dict(exclude_unset=True)
+    if "scheduled_time" in updates:
+        updates["scheduled_time"] = _to_utc_naive(updates["scheduled_time"])
+    if "started_at" in updates:
+        updates["started_at"] = _to_utc_naive(updates["started_at"])
+    if "ended_at" in updates:
+        updates["ended_at"] = _to_utc_naive(updates["ended_at"])
+    for field, value in updates.items():
         setattr(live_class, field, value)
     db.commit()
     db.refresh(live_class)

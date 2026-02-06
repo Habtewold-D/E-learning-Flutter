@@ -43,7 +43,7 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
   }
 
   String _endTimeText(LiveClass liveClass, DateFormat formatter) {
-    final base = liveClass.startedAt ?? liveClass.scheduledTime;
+    final base = (liveClass.startedAt ?? liveClass.scheduledTime)?.toLocal();
     if (base == null) {
       return 'Ends ~1h after start';
     }
@@ -347,10 +347,10 @@ class _LiveClassesScreenState extends State<LiveClassesScreen> {
                   Expanded(
                     child: Text(
                       liveClass.isActive
-                          ? 'Started: ${liveClass.startedAt != null ? formatter.format(liveClass.startedAt!) : "-"}'
+                          ? 'Started: ${liveClass.startedAt != null ? formatter.format(liveClass.startedAt!.toLocal()) : "-"}'
                           : liveClass.isScheduled
-                              ? 'Scheduled: ${liveClass.scheduledTime != null ? formatter.format(liveClass.scheduledTime!) : "-"}'
-                              : 'Ended: ${liveClass.endedAt != null ? formatter.format(liveClass.endedAt!) : "-"}',
+                            ? 'Scheduled: ${liveClass.scheduledTime != null ? formatter.format(liveClass.scheduledTime!.toLocal()) : "-"}'
+                            : 'Ended: ${liveClass.endedAt != null ? formatter.format(liveClass.endedAt!.toLocal()) : "-"}',
                       style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                       softWrap: false,

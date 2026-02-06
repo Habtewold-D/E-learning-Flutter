@@ -65,7 +65,7 @@ def join_live_class(
     live_class = refresh_live_class_status(db, live_class_id)
     if not live_class:
         raise HTTPException(status_code=404, detail="Live class not found")
-    now = datetime.now()
+    now = datetime.utcnow()
     if live_class.status != LiveClassStatus.ACTIVE:
         if current_user.role != UserRole.TEACHER or live_class.teacher_id != current_user.id:
             raise HTTPException(status_code=403, detail="Class has not started yet. Please wait for the teacher.")
@@ -117,7 +117,7 @@ def update_live_class_status(
     # Only teacher who created the class can update
     if live_class.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not allowed")
-    now = datetime.now()
+    now = datetime.utcnow()
 
     # Enforce timing: allow starting up to 5 minutes before scheduled_time
     if data.status == LiveClassStatus.ACTIVE or data.status == LiveClassStatus.ACTIVE.value:

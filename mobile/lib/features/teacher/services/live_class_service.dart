@@ -31,7 +31,7 @@ class LiveClassService {
       final requestData = {
         'course_id': courseId,
         'title': title,
-        if (scheduledTime != null) 'scheduled_time': scheduledTime.toIso8601String(),
+        if (scheduledTime != null) 'scheduled_time': scheduledTime.toUtc().toIso8601String(),
       };
 
       final response = await _apiClient.post('/live-classes/', data: requestData);
@@ -46,7 +46,7 @@ class LiveClassService {
     try {
       final updateData = {
         'status': 'active',
-        'started_at': DateTime.now().toIso8601String(),
+        'started_at': DateTime.now().toUtc().toIso8601String(),
       };
 
       final response = await _apiClient.patch('/live-classes/$liveClassId', data: updateData);
