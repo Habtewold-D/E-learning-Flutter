@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/rag/screens/course_selection_screen.dart';
 
 class StudentDrawer extends ConsumerWidget {
   const StudentDrawer({super.key});
@@ -127,6 +128,20 @@ class StudentDrawer extends ConsumerWidget {
             },
           ),
           const Divider(),
+          _buildDrawerItem(
+            context,
+            icon: Icons.smart_toy,
+            title: 'AI Assistant',
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CourseSelectionScreen(),
+                ),
+              );
+            },
+          ),
           _buildDrawerItem(
             context,
             icon: Icons.person,

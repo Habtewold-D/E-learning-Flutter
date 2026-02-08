@@ -7,6 +7,9 @@ from app.services.live_class_service import _auto_update_statuses
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api import auth, courses, exams, live, live_class, admin, notifications, rag
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from app.middleware.rate_limiter import general_limiter, rate_limit_exceeded_handler
 from pathlib import Path
 
 app = FastAPI(
@@ -14,6 +17,10 @@ app = FastAPI(
     description="Backend API for e-learning platform",
     version="1.0.0"
 )
+
+app.state.limiter = general_limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Serve uploaded files
 Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)

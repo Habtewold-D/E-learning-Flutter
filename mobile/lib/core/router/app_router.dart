@@ -36,6 +36,9 @@ import '../../features/admin/screens/admin_home_screen.dart';
 import '../../features/admin/screens/admin_teachers_screen.dart';
 import '../../features/admin/screens/admin_reports_screen.dart';
 import '../../features/admin/screens/admin_notifications_screen.dart';
+// RAG Screens
+import '../../features/rag/screens/ai_chat_screen.dart';
+import '../../features/rag/screens/teacher_rag_content_screen.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -272,6 +275,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'teacher-notifications',
         builder: (context, state) => const NotificationsScreen(isTeacher: true),
       ),
+      GoRoute(
+        path: '/teacher/rag-content',
+        name: 'teacher-rag-content',
+        builder: (context, state) => const TeacherRAGContentScreen(),
+      ),
 
       // Student Routes
       GoRoute(
@@ -388,6 +396,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/student/notifications',
         name: 'student-notifications',
         builder: (context, state) => const NotificationsScreen(isTeacher: false),
+      ),
+      GoRoute(
+        path: '/student/ai-chat',
+        name: 'student-ai-chat',
+        builder: (context, state) {
+          // Get course parameters from query or use defaults
+          final courseId = state.uri.queryParameters['courseId'] ?? '1';
+          final courseTitle = state.uri.queryParameters['courseTitle'] ?? 'Course';
+          return AIChatScreen(
+            courseId: int.parse(courseId),
+            courseTitle: courseTitle,
+          );
+        },
       ),
 
       // Legacy Routes (will be implemented later)

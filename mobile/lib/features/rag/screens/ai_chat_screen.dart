@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../services/rag_service.dart';
 import '../models/question_response.dart';
 import '../models/query_history.dart';
+import '../../../core/api/api_client.dart';
+import '../../../core/utils/constants.dart';
+import '../providers/rag_provider.dart';
 
 class AIChatScreen extends ConsumerStatefulWidget {
   final int courseId;
@@ -21,47 +25,44 @@ class AIChatScreen extends ConsumerStatefulWidget {
 class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   final TextEditingController _questionController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   bool _showHistory = false;
-  List<QueryHistoryItem> _queryHistory = [];
 
   @override
   void initState() {
     super.initState();
-    _loadQueryHistory();
     // Add welcome message
-    _addMessage(
-      ChatMessage(
-        text: 'Hello! I\'m your AI assistant for "${widget.courseTitle}". I can help you with questions about the course materials. What would you like to know?',
-        isUser: false,
-        timestamp: DateTime.now(),
-      ),
-    );
-  }
-
-  Future<void> _loadQueryHistory() async {
-    try {
-      // This would be implemented with Riverpod provider
-      // For now, showing empty history
-      setState(() {
-        _queryHistory = [];
-      });
-    } catch (e) {
-      // Handle error
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _addMessage(
+        ChatMessage(
+          text: 'Hello! I\'m your AI assistant for "${widget.courseTitle}". I can help you with questions about the course materials. What would you like to know?',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
+    });
   }
 
   void _addMessage(ChatMessage message) {
-    setState(() {
-      _messages.add(message);
-    });
+    final messages = ref.read(chatMessagesProvider.notifier);
+    messages.state = [...messages.state, {
+      'text': message.text,
+      'isUser': message.isUser,
+      'timestamp': message.timestamp,
+      'confidence': message.confidence,
+      'sources': message.sources,
+      'isError': message.isError,
+    }];
+    
+    // Auto-scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -82,48 +83,61 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
     _questionController.clear();
 
     // Show loading
-    setState(() {
-      _isLoading = true;
-    });
+    ref.read(chatLoadingProvider.notifier).state = true;
 
     try {
-      // This would call the RAG service
-      // For demo purposes, showing a mock response
-      await Future.delayed(const Duration(seconds: 2));
+      // Use real RAG service
+      final apiClient = ApiClient();
+      final ragService = RAGService(apiClient);
       
+      final result = await ragService.askQuestion(
+        courseId: widget.courseId,
+        question: question,
+      );
+
+      // Add AI response
       _addMessage(
         ChatMessage(
-          text: 'This is a demo response. In the actual implementation, this would be an AI-generated answer based on your course materials.',
+          text: result['answer'] as String,
           isUser: false,
           timestamp: DateTime.now(),
-          confidence: 0.85,
-          sources: [
-            {'title': 'Chapter 1: Introduction', 'page': 15},
-            {'title': 'Video Lecture 2', 'timestamp': '12:30'},
-          ],
+          confidence: (result['confidence'] as num?)?.toDouble(),
+          sources: result['sources'] as List<Map<String, dynamic>>?,
         ),
       );
+
     } catch (e) {
       _addMessage(
         ChatMessage(
-          text: 'Sorry, I encountered an error while processing your question. Please try again.',
+          text: 'Sorry, I encountered an error. Please try again.',
           isUser: false,
           timestamp: DateTime.now(),
           isError: true,
         ),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      ref.read(chatLoadingProvider.notifier).state = false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final messages = ref.watch(chatMessagesProvider);
+    final isLoading = ref.watch(chatLoadingProvider);
+    
     return Scaffold(
       appBar: AppBar(
         title: Text('AI Assistant - ${widget.courseTitle}'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/student/home');
+            }
+          },
+        ),
         actions: [
           IconButton(
             icon: Icon(_showHistory ? Icons.chat : Icons.history),
@@ -132,27 +146,36 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                 _showHistory = !_showHistory;
               });
             },
+            tooltip: _showHistory ? 'Chat View' : 'Query History',
           ),
         ],
       ),
-      body: _showHistory ? _buildHistoryView() : _buildChatView(),
+      body: _showHistory ? _buildHistoryView() : _buildChatView(messages, isLoading),
     );
   }
 
-  Widget _buildChatView() {
+  Widget _buildChatView(List<Map<String, dynamic>> messages, bool isLoading) {
     return Column(
       children: [
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.all(16),
-            itemCount: _messages.length,
+            itemCount: messages.length,
             itemBuilder: (context, index) {
-              return _buildMessageBubble(_messages[index]);
+              final messageData = messages[index];
+              return _buildMessageBubble(ChatMessage(
+                text: messageData['text'] as String,
+                isUser: messageData['isUser'] as bool,
+                timestamp: messageData['timestamp'] as DateTime,
+                confidence: messageData['confidence'] as double?,
+                sources: messageData['sources'] as List<Map<String, dynamic>>?,
+                isError: messageData['isError'] as bool? ?? false,
+              ));
             },
           ),
         ),
-        if (_isLoading)
+        if (isLoading)
           const Padding(
             padding: EdgeInsets.all(16),
             child: Row(
@@ -162,8 +185,8 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                SizedBox(width: 8),
-                Text('Thinking...'),
+                const SizedBox(width: 8),
+                const Text('Thinking...'),
               ],
             ),
           ),
@@ -393,64 +416,93 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   Widget _buildHistoryView() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _queryHistory.length,
-      itemBuilder: (context, index) {
-        final item = _queryHistory[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(
-              item.question,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.answer,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Row(
+    return Consumer(
+      builder: (context, ref, child) {
+        final queryHistoryAsync = ref.watch(queryHistoryProvider);
+        
+        return queryHistoryAsync.when(
+          data: (history) {
+            if (history.isEmpty) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.schedule,
-                      size: 14,
-                      color: Colors.grey.shade600,
+                      Icons.history,
+                      size: 64,
+                      color: Colors.grey,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      item.formattedDate,
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No questions yet',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                        fontSize: 16,
+                        color: Colors.grey,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Icon(
-                      Icons.assessment,
-                      size: 14,
-                      color: _getConfidenceColor(item.confidence),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${(item.confidence * 100).toInt()}%',
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Start asking questions about your course materials!',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: _getConfidenceColor(item.confidence),
+                        fontSize: 14,
+                        color: Color(0xFF757575),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              // Navigate to detailed answer view
-            },
+              );
+            }
+            
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: history.length,
+              itemBuilder: (context, index) {
+                final item = history[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    title: Text(
+                      item.question,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      item.answer.length > 100 
+                          ? '${item.answer.substring(0, 100)}...'
+                          : item.answer,
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    trailing: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${(item.confidence * 100).toInt()}%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _getConfidenceColor(item.confidence),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          item.formattedDate,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      // Navigate to detailed answer view
+                    },
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(
+            child: Text('Error: $error'),
           ),
         );
       },

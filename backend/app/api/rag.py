@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+import asyncio
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models.user import User
 from app.api.dependencies import get_current_user
 from app.services.rag_service import RAGService
@@ -18,9 +19,20 @@ from pydantic import BaseModel
 router = APIRouter()
 
 
+def _run_indexing_task(content_id: int) -> None:
+    db = SessionLocal()
+    try:
+        rag_service = RAGService(db)
+        asyncio.run(rag_service.process_uploaded_content(content_id))
+    finally:
+        db.close()
+
+
 @router.post("/ask", response_model=QuestionResponse)
+@general_limiter.limit("10/minute")
 async def ask_question(
-    request: QuestionRequest,
+    payload: QuestionRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -29,8 +41,8 @@ async def ask_question(
         rag_service = RAGService(db)
         result = await rag_service.answer_student_question(
             student_id=current_user.id,
-            course_id=request.course_id,
-            question=request.question
+            course_id=payload.course_id,
+            question=payload.question
         )
         
         return QuestionResponse(
@@ -87,14 +99,13 @@ async def index_content(
         if not content:
             raise HTTPException(status_code=404, detail="Content not found or access denied")
         
-        # Process in background
-        rag_service = RAGService(db)
-        result = await rag_service.process_uploaded_content(content_id)
+        # Process in background with a fresh DB session
+        background_tasks.add_task(_run_indexing_task, content_id)
         
         return ContentIndexingResponse(
             content_id=content_id,
-            status=result["status"],
-            chunks_created=result["chunks_created"]
+            status="indexing",
+            chunks_created=0
         )
         
     except Exception as e:

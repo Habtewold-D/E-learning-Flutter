@@ -1,6 +1,6 @@
 import asyncio
 import json
-import requests
+import httpx
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 import PyPDF2
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.course import CourseContent, ContentType
 from app.models.rag import DocumentChunk, StudentQuery, VectorIndex
+from sqlalchemy.sql import func
 from app.core.exceptions import ValidationError, NotFoundError
 import logging
 
@@ -20,9 +21,6 @@ class RAGService:
     
     def __init__(self, db: Session):
         self.db = db
-        # Using Groq exclusively for production
-        if not settings.GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY is required for RAG functionality")
         
     async def process_uploaded_content(self, content_id: int) -> Dict[str, Any]:
         """Process uploaded content for RAG indexing."""
@@ -30,9 +28,23 @@ class RAGService:
         if not content:
             raise NotFoundError("Content not found")
         
-        # Mark as indexing
-        vector_index = VectorIndex(content_id=content_id, is_indexed=1)
-        self.db.add(vector_index)
+        # Mark as indexing (idempotent)
+        vector_index = (
+            self.db.query(VectorIndex)
+            .filter(VectorIndex.content_id == content_id)
+            .first()
+        )
+        if vector_index is None:
+            vector_index = VectorIndex(content_id=content_id, is_indexed=1)
+            self.db.add(vector_index)
+        else:
+            vector_index.is_indexed = 1
+            vector_index.chunk_count = 0
+            vector_index.error_message = None
+            vector_index.last_updated = func.now()
+
+        # Clear old chunks before re-indexing
+        self.db.query(DocumentChunk).filter(DocumentChunk.content_id == content_id).delete()
         self.db.commit()
         
         try:
@@ -96,11 +108,15 @@ class RAGService:
             raise ValidationError(f"Failed to process PDF: {str(e)}")
     
     async def _download_file_from_url(self, url: str) -> bytes:
-        """Download file from URL."""
+        """Download file from URL or load from local path."""
         try:
-            response = requests.get(url, timeout=30)
-            response.raise_for_status()
-            return response.content
+            if not (url.startswith("http://") or url.startswith("https://")):
+                raise ValidationError("Content URL must be an http/https URL")
+
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                return response.content
         except Exception as e:
             logger.error(f"Error downloading file: {str(e)}")
             raise ValidationError(f"Failed to download file: {str(e)}")
@@ -296,6 +312,8 @@ class RAGService:
     
     async def _groq_generate(self, question: str, context: str) -> str:
         """Generate answer using Groq."""
+        if not settings.GROQ_API_KEY:
+            raise ValidationError("GROQ_API_KEY is required for RAG answer generation")
         prompt = f"""Based on the following course materials, answer the student's question.
 
 Course Materials:
@@ -306,27 +324,27 @@ Student Question: {question}
 Provide a helpful, accurate answer based only on the provided materials. If the materials don't contain enough information, say so clearly."""
 
         try:
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "llama-3.1-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": "You are a helpful AI tutor that answers questions based on provided course materials."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 500,
-                    "temperature": 0.7
-                }
-            )
-            
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "llama-3.1-70b-versatile",
+                        "messages": [
+                            {"role": "system", "content": "You are a helpful AI tutor that answers questions based on provided course materials."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 500,
+                        "temperature": 0.7
+                    }
+                )
+
             if response.status_code == 200:
                 return response.json()["choices"][0]["message"]["content"]
-            else:
-                raise Exception(f"Groq API error: {response.status_code}")
+            raise Exception(f"Groq API error: {response.status_code}")
                 
         except Exception as e:
             logger.error(f"Groq generation error: {str(e)}")

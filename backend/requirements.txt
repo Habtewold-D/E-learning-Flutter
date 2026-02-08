@@ -36,5 +36,6 @@ redis>=5.0.0
 # Firebase FCM HTTP v1
 google-auth==2.27.0
 requests==2.31.0
+httpx==0.27.2
 
 # CORS is built into FastAPI
