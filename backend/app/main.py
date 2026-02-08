@@ -6,7 +6,7 @@ from app.core.database import SessionLocal
 from app.services.live_class_service import _auto_update_statuses
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api import auth, courses, exams, live, live_class, admin, notifications
+from app.api import auth, courses, exams, live, live_class, admin, notifications, rag
 from pathlib import Path
 
 app = FastAPI(
@@ -36,6 +36,7 @@ app.include_router(live.router, prefix="/api/live", tags=["Live Classes"])
 app.include_router(live_class.router, prefix="/api", tags=["Live Class Scheduling"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(rag.router, prefix="/api/rag", tags=["RAG - AI Assistant"])
 
 
 @app.on_event("startup")

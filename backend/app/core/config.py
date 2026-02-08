@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Firebase (FCM HTTP v1)
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     
+    # RAG Configuration - Groq Only
+    GROQ_API_KEY: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

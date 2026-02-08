@@ -44,6 +44,8 @@ class CourseContent(Base):
     # Relationships
     course = relationship("Course", back_populates="contents")
     progress_entries = relationship("ContentProgress", back_populates="content", cascade="all, delete-orphan")
+    chunks = relationship("DocumentChunk", back_populates="content", cascade="all, delete-orphan")
+    vector_index = relationship("VectorIndex", back_populates="content", uselist=False, cascade="all, delete-orphan")
 
 
 class Enrollment(Base):

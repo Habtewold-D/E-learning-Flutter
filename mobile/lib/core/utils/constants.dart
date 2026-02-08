@@ -38,6 +38,12 @@ class AppConstants {
   static const String notificationTokens = '/notifications/tokens';
   static const String notificationsInApp = '/notifications/inapp';
 
+  // RAG - AI Assistant
+  static const String ragAsk = '/rag/ask';
+  static const String ragHistory = '/rag/history';
+  static const String ragIndexStatus = '/rag/index-status/{content_id}';
+  static const String ragIndexContent = '/rag/index-content/{content_id}';
+
   // JaaS live class token is served by backend
   
   // File Upload

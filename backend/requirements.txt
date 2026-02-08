@@ -25,9 +25,16 @@ aiofiles==23.2.1
 python-magic==0.4.27
 cloudinary==1.39.0
 
+# RAG System - Simplified for Groq
+PyPDF2==3.0.1
+numpy==1.24.3
+
+# Rate Limiting
+slowapi==0.1.9
+redis>=5.0.0
+
 # Firebase FCM HTTP v1
 google-auth==2.27.0
 requests==2.31.0
 
 # CORS is built into FastAPI
-
