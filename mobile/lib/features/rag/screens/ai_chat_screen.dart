@@ -31,28 +31,38 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Add welcome message
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _addMessage(
-        ChatMessage(
-          text: 'Hello! I\'m your AI assistant for "${widget.courseTitle}". I can help you with questions about the course materials. What would you like to know?',
-          isUser: false,
-          timestamp: DateTime.now(),
-        ),
-      );
+      final byCourse = ref.read(chatMessagesByCourseProvider);
+      final current = byCourse[widget.courseId] ?? [];
+      if (current.isEmpty) {
+        _addMessage(
+          ChatMessage(
+            text: 'Hello! I\'m your AI assistant for "${widget.courseTitle}". I can help you with questions about the course materials. What would you like to know?',
+            isUser: false,
+            timestamp: DateTime.now(),
+          ),
+        );
+      }
     });
   }
 
   void _addMessage(ChatMessage message) {
-    final messages = ref.read(chatMessagesProvider.notifier);
-    messages.state = [...messages.state, {
+    final messages = ref.read(chatMessagesByCourseProvider.notifier);
+    final current = List<Map<String, dynamic>>.from(
+      messages.state[widget.courseId] ?? const [],
+    );
+    current.add({
       'text': message.text,
       'isUser': message.isUser,
       'timestamp': message.timestamp,
       'confidence': message.confidence,
       'sources': message.sources,
       'isError': message.isError,
-    }];
+    });
+    messages.state = {
+      ...messages.state,
+      widget.courseId: current,
+    };
     
     // Auto-scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -129,7 +139,8 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final messages = ref.watch(chatMessagesProvider);
+    final messagesByCourse = ref.watch(chatMessagesByCourseProvider);
+    final messages = messagesByCourse[widget.courseId] ?? [];
     final isLoading = ref.watch(chatLoadingProvider);
     
     return Scaffold(
@@ -203,6 +214,11 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final assistantBg = colorScheme.surface;
+    final assistantText = colorScheme.onSurface;
+    final errorBg = colorScheme.errorContainer;
+    final errorText = colorScheme.onErrorContainer;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -226,14 +242,14 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                   ),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: message.isUser 
-                        ? Theme.of(context).colorScheme.primary
-                        : message.isError 
-                            ? Colors.red.shade50
-                            : Colors.grey.shade100,
+                    color: message.isUser
+                        ? colorScheme.primary
+                        : message.isError
+                            ? errorBg
+                            : assistantBg,
                     borderRadius: BorderRadius.circular(16),
-                    border: message.isError 
-                        ? Border.all(color: Colors.red.shade200)
+                    border: message.isError
+                        ? Border.all(color: colorScheme.error)
                         : null,
                   ),
                   child: Column(
@@ -242,11 +258,11 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                       Text(
                         message.text,
                         style: TextStyle(
-                          color: message.isUser 
-                              ? Colors.white
-                              : message.isError 
-                                  ? Colors.red.shade700
-                                  : Colors.black87,
+                          color: message.isUser
+                              ? colorScheme.onPrimary
+                              : message.isError
+                                  ? errorText
+                                  : assistantText,
                         ),
                       ),
                       if (message.confidence != null && !message.isUser) ...[
@@ -326,6 +342,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   Widget _buildSourcesList(List<Map<String, dynamic>> sources) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -334,7 +351,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 4),
@@ -345,15 +362,15 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
               Icon(
                 Icons.source,
                 size: 12,
-                color: Colors.grey.shade600,
+                color: colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  source['title'] ?? 'Unknown Source',
+                  source['content_title'] ?? source['title'] ?? 'Unknown Source',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey.shade600,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -365,13 +382,14 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   Widget _buildInputArea() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -389,11 +407,11 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderSide: BorderSide(color: colorScheme.outline),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                  borderSide: BorderSide(color: colorScheme.primary),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -425,7 +443,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   Widget _buildHistoryView() {
     return Consumer(
       builder: (context, ref, child) {
-        final queryHistoryAsync = ref.watch(queryHistoryProvider);
+        final queryHistoryAsync = ref.watch(queryHistoryProvider(widget.courseId));
         
         return queryHistoryAsync.when(
           data: (history) {
@@ -500,7 +518,31 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                       ],
                     ),
                     onTap: () {
-                      // Navigate to detailed answer view
+                      final messages = ref.read(chatMessagesByCourseProvider.notifier);
+                      messages.state = {
+                        ...messages.state,
+                        widget.courseId: [
+                          {
+                            'text': item.question,
+                            'isUser': true,
+                            'timestamp': item.createdAt,
+                            'confidence': null,
+                            'sources': null,
+                            'isError': false,
+                          },
+                          {
+                            'text': item.answer,
+                            'isUser': false,
+                            'timestamp': item.createdAt,
+                            'confidence': item.confidence,
+                            'sources': item.sources,
+                            'isError': false,
+                          },
+                        ],
+                      };
+                      setState(() {
+                        _showHistory = false;
+                      });
                     },
                   ),
                 );

@@ -164,7 +164,7 @@ class _CourseSelectionScreenState extends ConsumerState<CourseSelectionScreen> {
                             ),
                             trailing: const Icon(Icons.arrow_forward_ios),
                             onTap: () {
-                              context.go(
+                              context.push(
                                 '/student/ai-chat?courseId=${course.id}&courseTitle=${Uri.encodeComponent(course.title)}'
                               );
                             },

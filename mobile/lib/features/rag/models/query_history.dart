@@ -6,6 +6,7 @@ class QueryHistoryItem {
   final DateTime createdAt;
   final int courseId;
   final String courseTitle;
+  final List<Map<String, dynamic>> sources;
 
   QueryHistoryItem({
     required this.id,
@@ -15,6 +16,7 @@ class QueryHistoryItem {
     required this.createdAt,
     required this.courseId,
     required this.courseTitle,
+    required this.sources,
   });
 
   factory QueryHistoryItem.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,9 @@ class QueryHistoryItem {
       createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
       courseId: json['course_id'] ?? 0,
       courseTitle: json['course_title'] ?? 'Unknown Course',
+      sources: json['sources'] is List
+          ? List<Map<String, dynamic>>.from(json['sources'] as List)
+          : [],
     );
   }
 
