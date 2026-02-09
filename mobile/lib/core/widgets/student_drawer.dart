@@ -127,7 +127,6 @@ class StudentDrawer extends ConsumerWidget {
               context.go('/student/notifications');
             },
           ),
-          const Divider(),
           _buildDrawerItem(
             context,
             icon: Icons.smart_toy,
@@ -142,6 +141,7 @@ class StudentDrawer extends ConsumerWidget {
               );
             },
           ),
+          const Divider(),
           _buildDrawerItem(
             context,
             icon: Icons.person,

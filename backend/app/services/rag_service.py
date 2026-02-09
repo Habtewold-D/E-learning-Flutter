@@ -121,9 +121,30 @@ class RAGService:
             logger.error(f"Error downloading file: {str(e)}")
             raise ValidationError(f"Failed to download file: {str(e)}")
     
-    def _split_text_into_chunks(self, text: str, chunk_size: int = 800, overlap_sentences: int = 1) -> List[str]:
-        """Split text into sentence-based chunks with light overlap."""
+    def _split_text_into_chunks(
+        self,
+        text: str,
+        chunk_size: int = 800,
+        overlap: int = 1,
+        overlap_sentences: Optional[int] = None,
+    ) -> List[str]:
+        """Split text into sentence-based chunks with light overlap.
+
+        Accept both `overlap` (legacy/call-site) and `overlap_sentences` names.
+        If `overlap` looks like a large number (e.g., characters), map it
+        into an estimated sentence count to keep behavior sensible.
+        """
         import re
+
+        # Determine how many sentences to overlap
+        if overlap_sentences is None:
+            if overlap <= 5:
+                overlap_sentences = int(overlap)
+            else:
+                # If caller passed a larger number (likely characters),
+                # estimate sentences to overlap using a rough average sentence
+                # length of ~100 characters.
+                overlap_sentences = max(1, int(overlap / 100))
 
         sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
         if not sentences:
@@ -137,7 +158,7 @@ class RAGService:
             if current_len + len(sentence) + 1 > chunk_size and current:
                 chunks.append(" ".join(current).strip())
                 # overlap last N sentences
-                current = current[-overlap_sentences:] if overlap_sentences > 0 else []
+                current = current[-overlap_sentences:] if overlap_sentences and overlap_sentences > 0 else []
                 current_len = sum(len(s) + 1 for s in current)
 
             current.append(sentence)

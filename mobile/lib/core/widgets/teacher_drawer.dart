@@ -151,15 +151,6 @@ class TeacherDrawer extends ConsumerWidget {
           const Divider(),
           _buildDrawerItem(
             context,
-            icon: Icons.person,
-            title: 'Profile',
-            onTap: () {
-              Navigator.pop(context);
-              context.go('/teacher/profile');
-            },
-          ),
-          _buildDrawerItem(
-            context,
             icon: Icons.settings,
             title: 'Settings',
             onTap: () {
