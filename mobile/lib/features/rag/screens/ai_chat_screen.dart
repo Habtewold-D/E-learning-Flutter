@@ -343,6 +343,14 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
 
   Widget _buildSourcesList(List<Map<String, dynamic>> sources) {
     final colorScheme = Theme.of(context).colorScheme;
+    final seen = <String>{};
+    final uniqueSources = <String>[];
+    for (final source in sources) {
+        final title = (source['content_title'] ?? source['title'] ?? 'Unknown Source').toString();
+        if (seen.add(title)) {
+          uniqueSources.add(title);
+        }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -355,7 +363,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        ...sources.map((source) => Padding(
+        ...uniqueSources.map((title) => Padding(
           padding: const EdgeInsets.only(top: 2),
           child: Row(
             children: [
@@ -367,7 +375,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  source['content_title'] ?? source['title'] ?? 'Unknown Source',
+                  title,
                   style: TextStyle(
                     fontSize: 11,
                     color: colorScheme.onSurfaceVariant,

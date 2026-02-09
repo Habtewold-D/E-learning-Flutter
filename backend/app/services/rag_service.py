@@ -121,33 +121,31 @@ class RAGService:
             logger.error(f"Error downloading file: {str(e)}")
             raise ValidationError(f"Failed to download file: {str(e)}")
     
-    def _split_text_into_chunks(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
-        """Split text into overlapping chunks."""
-        chunks = []
-        start = 0
-        
-        while start < len(text):
-            end = start + chunk_size
-            
-            if end >= len(text):
-                chunks.append(text[start:])
-                break
-            
-            # Try to break at sentence boundary
-            chunk_text = text[start:end]
-            last_period = chunk_text.rfind('.')
-            last_question = chunk_text.rfind('?')
-            last_exclamation = chunk_text.rfind('!')
-            
-            best_break = max(last_period, last_question, last_exclamation)
-            
-            if best_break > start + chunk_size // 2:  # Don't go back too far
-                end = start + best_break + 1
-                chunk_text = text[start:end]
-            
-            chunks.append(chunk_text.strip())
-            start = end - overlap
-        
+    def _split_text_into_chunks(self, text: str, chunk_size: int = 800, overlap_sentences: int = 1) -> List[str]:
+        """Split text into sentence-based chunks with light overlap."""
+        import re
+
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
+        if not sentences:
+            return []
+
+        chunks: List[str] = []
+        current: List[str] = []
+        current_len = 0
+
+        for sentence in sentences:
+            if current_len + len(sentence) + 1 > chunk_size and current:
+                chunks.append(" ".join(current).strip())
+                # overlap last N sentences
+                current = current[-overlap_sentences:] if overlap_sentences > 0 else []
+                current_len = sum(len(s) + 1 for s in current)
+
+            current.append(sentence)
+            current_len += len(sentence) + 1
+
+        if current:
+            chunks.append(" ".join(current).strip())
+
         return [chunk for chunk in chunks if chunk.strip()]
     
     async def _store_chunks_with_embeddings(self, content_id: int, chunks: List[Dict[str, Any]]) -> None:
@@ -199,14 +197,23 @@ class RAGService:
         return embedding[:384]
     
     async def answer_student_question(
-        self, 
-        student_id: int, 
-        course_id: int, 
+        self,
+        student_id: int,
+        course_id: int,
         question: str
     ) -> Dict[str, Any]:
         """Answer student question using RAG."""
         import time
         start_time = time.time()
+
+        normalized = question.strip().lower()
+        if len(normalized.split()) <= 2 or normalized in {"hi", "hello", "hey", "thanks", "thank you"}:
+            return {
+                "answer": "Hi! Ask me a specific question from the course materials and I’ll answer it.",
+                "confidence": 0.0,
+                "sources": [],
+                "response_time_ms": int((time.time() - start_time) * 1000),
+            }
         
         try:
             # Retrieve relevant chunks
@@ -219,8 +226,15 @@ class RAGService:
                     "sources": []
                 }
             
-            # Generate answer using LLM
-            context = "\n\n".join([chunk["text"] for chunk in relevant_chunks[:3]])  # Top 3 chunks
+            # Generate answer using LLM with structured context
+            context_blocks = []
+            for chunk in relevant_chunks:
+                meta = chunk.get("metadata", {}) or {}
+                title = meta.get("content_title", "Course material")
+                page = meta.get("page_number")
+                header = f"Source: {title}" + (f" (page {page})" if page else "")
+                context_blocks.append(f"{header}\n{chunk['text']}")
+            context = "\n\n".join(context_blocks)
             answer = await self._generate_answer(question, context)
             
             # Calculate response time
@@ -233,7 +247,7 @@ class RAGService:
                 question=question,
                 answer=answer,
                 context_chunks=[chunk["metadata"] for chunk in relevant_chunks],
-                confidence_score=min(len(relevant_chunks) / 5.0, 1.0),  # Simple confidence calculation
+                confidence_score=min(len(relevant_chunks) / 2.0, 1.0),  # Simple confidence calculation
                 response_time_ms=response_time
             )
             self.db.add(query_record)
@@ -254,7 +268,7 @@ class RAGService:
                 "sources": []
             }
     
-    async def _retrieve_relevant_chunks(self, course_id: int, question: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    async def _retrieve_relevant_chunks(self, course_id: int, question: str, top_k: int = 2) -> List[Dict[str, Any]]:
         """Retrieve most relevant chunks for a question."""
         try:
             # Generate question embedding

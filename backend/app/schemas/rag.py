@@ -6,7 +6,7 @@ from datetime import datetime
 class QuestionRequest(BaseModel):
     """Request model for asking a question."""
     course_id: int = Field(..., description="ID of the course")
-    question: str = Field(..., min_length=5, max_length=1000, description="Student's question")
+    question: str = Field(..., min_length=2, max_length=1000, description="Student's question")
 
 
 class QuestionResponse(BaseModel):
