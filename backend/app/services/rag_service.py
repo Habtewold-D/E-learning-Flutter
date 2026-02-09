@@ -2,6 +2,7 @@ import asyncio
 import os
 import json
 import httpx
+import psutil  # Add memory monitoring
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 import PyPDF2
@@ -15,6 +16,7 @@ from app.core.exceptions import ValidationError, NotFoundError
 import logging
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+from sentence_transformers import SentenceTransformer
 os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", os.path.abspath("./model_cache"))
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("ONNXRUNTIME_DISABLE", "1")
@@ -28,27 +30,35 @@ logger = logging.getLogger(__name__)
 class RAGService:
     """Service for RAG (Retrieval-Augmented Generation) functionality using Groq + Sentence Transformers + ChromaDB."""
     
+    # Class-level singleton for embedding model
+    _embedding_model = None
+    
     def __init__(self, db: Session):
         self.db = db
-        # Initialize ChromaDB client with persistence (telemetry disabled)
-        self.chroma_client = chromadb.PersistentClient(
-            path="./chroma_db",
-            settings=ChromaSettings(anonymized_telemetry=False)
-        )
+        # Initialize ChromaDB client with persistence
+        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
         self.collection = self.chroma_client.get_or_create_collection("course_content")
         
-        # Load sentence transformer model once (singleton pattern)
-        if not hasattr(RAGService, '_embedding_model'):
+        # Load sentence transformer model once (TRUE singleton) with memory monitoring
+        if RAGService._embedding_model is None:
+            # Check available memory before loading
+            memory_before = psutil.virtual_memory().available / (1024 * 1024 * 1024)  # GB
+            logger.info(f"Available memory before model load: {memory_before:.2f}GB")
+            
+            logger.info("Loading sentence transformer model ONCE (true singleton)")
             RAGService._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Loaded sentence transformer model once (singleton)")
+            
+            # Check memory after loading
+            memory_after = psutil.virtual_memory().available / (1024 * 1024 * 1024)  # GB
+            memory_used = memory_before - memory_after
+            logger.info(f"Memory used by model: {memory_used:.2f}GB")
+            logger.info(f"Available memory after load: {memory_after:.2f}GB")
         else:
             logger.info("Reusing existing sentence transformer model")
 
     @classmethod
     def get_embedding_model(cls):
-        if not hasattr(cls, '_embedding_model'):
-            cls._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Loaded sentence transformer model")
+        """Get singleton embedding model instance."""
         return cls._embedding_model
         
     async def process_uploaded_content(self, content_id: int) -> Dict[str, Any]:
