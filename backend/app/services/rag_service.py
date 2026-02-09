@@ -273,7 +273,7 @@ class RAGService:
                     "chunk": chunk,
                     "similarity": similarity,
                     "text": chunk.chunk_text,
-                    "metadata": chunk.metadata
+                    "metadata": chunk.chunk_metadata
                 })
             
             # Sort by similarity and return top_k
@@ -332,7 +332,7 @@ Provide a helpful, accurate answer based only on the provided materials. If the 
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "llama-3.1-70b-versatile",
+                        "model": "llama-3.1-8b-instant",
                         "messages": [
                             {"role": "system", "content": "You are a helpful AI tutor that answers questions based on provided course materials."},
                             {"role": "user", "content": prompt}
@@ -344,7 +344,7 @@ Provide a helpful, accurate answer based only on the provided materials. If the 
 
             if response.status_code == 200:
                 return response.json()["choices"][0]["message"]["content"]
-            raise Exception(f"Groq API error: {response.status_code}")
+            raise Exception(f"Groq API error: {response.status_code} - {response.text}")
                 
         except Exception as e:
             logger.error(f"Groq generation error: {str(e)}")

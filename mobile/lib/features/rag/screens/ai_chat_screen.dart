@@ -95,14 +95,21 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
         question: question,
       );
 
+      final answer = result['answer']?.toString() ?? '';
+      final confidence = (result['confidence'] as num?)?.toDouble();
+      final sourcesRaw = result['sources'];
+      final sources = sourcesRaw is List
+          ? sourcesRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+          : null;
+
       // Add AI response
       _addMessage(
         ChatMessage(
-          text: result['answer'] as String,
+          text: answer,
           isUser: false,
           timestamp: DateTime.now(),
-          confidence: (result['confidence'] as num?)?.toDouble(),
-          sources: result['sources'] as List<Map<String, dynamic>>?,
+          confidence: confidence,
+          sources: sources,
         ),
       );
 
