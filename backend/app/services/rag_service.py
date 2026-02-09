@@ -1,4 +1,5 @@
 import asyncio
+import os
 import json
 import httpx
 from typing import List, Dict, Any, Optional, Tuple
@@ -14,6 +15,11 @@ from app.core.exceptions import ValidationError, NotFoundError
 import logging
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", os.path.abspath("./model_cache"))
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("ONNXRUNTIME_DISABLE", "1")
+os.environ.setdefault("DISABLE_OPENVINO", "1")
+
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)

@@ -106,12 +106,18 @@ class RAGService {
         return 'Response timeout. Please try again.';
       case DioExceptionType.badResponse:
         if (e.response?.data != null) {
-          final data = e.response!.data as Map<String, dynamic>;
-          if (data['detail'] != null) {
-            return data['detail'].toString();
+          final data = e.response!.data;
+          if (data is Map<String, dynamic>) {
+            if (data['detail'] != null) {
+              return data['detail'].toString();
+            }
+            if (data['error'] is Map && (data['error'] as Map)['message'] != null) {
+              return (data['error'] as Map)['message'].toString();
+            }
+            return data.toString();
           }
-          if (data['error'] is Map && (data['error'] as Map)['message'] != null) {
-            return (data['error'] as Map)['message'].toString();
+          if (data is String) {
+            return data;
           }
           return data.toString();
         }
