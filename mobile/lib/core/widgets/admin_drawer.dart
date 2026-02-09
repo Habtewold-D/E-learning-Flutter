@@ -109,6 +109,15 @@ class AdminDrawer extends ConsumerWidget {
               context.go('/admin/reports');
             },
           ),
+          _buildDrawerItem(
+            context,
+            icon: Icons.psychology,
+            title: 'AI Content Management',
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/admin/rag-content');
+            },
+          ),
           const Divider(),
           _buildDrawerItem(
             context,

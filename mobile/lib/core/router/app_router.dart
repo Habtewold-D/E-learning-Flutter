@@ -38,7 +38,7 @@ import '../../features/admin/screens/admin_reports_screen.dart';
 import '../../features/admin/screens/admin_notifications_screen.dart';
 // RAG Screens
 import '../../features/rag/screens/ai_chat_screen.dart';
-import '../../features/rag/screens/teacher_rag_content_screen.dart';
+import '../../features/rag/screens/admin_rag_content_screen.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -276,11 +276,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NotificationsScreen(isTeacher: true),
       ),
       GoRoute(
-        path: '/teacher/rag-content',
-        name: 'teacher-rag-content',
-        builder: (context, state) => const TeacherRAGContentScreen(),
+        path: '/admin/rag-content',
+        name: 'admin-rag-content',
+        builder: (context, state) => const AdminRAGContentScreen(),
       ),
-
       // Student Routes
       GoRoute(
         path: '/student',

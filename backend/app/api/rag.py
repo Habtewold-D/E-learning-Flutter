@@ -118,18 +118,22 @@ async def index_content(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Process and index content for RAG (teachers only)."""
+    """Process and index content for RAG (teachers/admins only)."""
     try:
-        # Only teachers can trigger indexing
-        if current_user.role != "teacher":
-            raise HTTPException(status_code=403, detail="Only teachers can index content")
+        # Only teachers or admins can trigger indexing
+        role_value = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+        role_value = role_value.lower()
+        if role_value not in {"teacher", "admin"}:
+            raise HTTPException(status_code=403, detail="Only teachers or admins can index content")
         
         # Check if user owns the content
         from app.models.course import CourseContent, Course
-        content = db.query(CourseContent).join(Course).filter(
-            CourseContent.id == content_id,
-            Course.teacher_id == current_user.id
-        ).first()
+        content_query = db.query(CourseContent).join(Course).filter(
+            CourseContent.id == content_id
+        )
+        if role_value == "teacher":
+            content_query = content_query.filter(Course.teacher_id == current_user.id)
+        content = content_query.first()
         
         if not content:
             raise HTTPException(status_code=404, detail="Content not found or access denied")

@@ -13,6 +13,7 @@ from sqlalchemy.sql import func
 from app.core.exceptions import ValidationError, NotFoundError
 import logging
 import chromadb
+from chromadb.config import Settings as ChromaSettings
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,11 @@ class RAGService:
     
     def __init__(self, db: Session):
         self.db = db
-        # Initialize ChromaDB client with persistence
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        # Initialize ChromaDB client with persistence (telemetry disabled)
+        self.chroma_client = chromadb.PersistentClient(
+            path="./chroma_db",
+            settings=ChromaSettings(anonymized_telemetry=False)
+        )
         self.collection = self.chroma_client.get_or_create_collection("course_content")
         
         # Load sentence transformer model once (singleton pattern)
@@ -33,6 +37,13 @@ class RAGService:
             logger.info("Loaded sentence transformer model once (singleton)")
         else:
             logger.info("Reusing existing sentence transformer model")
+
+    @classmethod
+    def get_embedding_model(cls):
+        if not hasattr(cls, '_embedding_model'):
+            cls._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("Loaded sentence transformer model")
+        return cls._embedding_model
         
     async def process_uploaded_content(self, content_id: int) -> Dict[str, Any]:
         """Process uploaded content for RAG indexing."""
@@ -419,18 +430,8 @@ class RAGService:
                     "sources": []
                 }
             
-            # Generate answer using LLM with structured context
-            context_blocks = []
-            for i, chunk in enumerate(relevant_chunks):
-                meta = chunk.get("metadata", {}) or {}
-                title = meta.get("content_title", "Course material")
-                page = meta.get("page_number")
-                similarity = chunk.get("similarity", 0)
-                
-                header = f"Source {i+1}: {title}" + (f" (page {page})" if page else f" (similarity: {similarity:.2f})")
-                context_blocks.append(f"{header}\n{chunk['text']}")
-            
-            # Build structured context with relevance ordering
+            # Generate answer using LLM with plain context
+            context_blocks = [chunk["text"] for chunk in relevant_chunks]
             context = "\n\n---\n\n".join(context_blocks)
             answer = await self._generate_answer(question, context)
             
@@ -618,7 +619,7 @@ class RAGService:
             logger.warning("GROQ_API_KEY not configured, using fallback answer")
             return self._fallback_answer(question, context)
         
-        prompt = f"""You are an expert AI tutor helping students learn from course materials. 
+        prompt = f"""You are an expert AI tutor helping students learn from course materials.
 
 CONTEXT from course materials:
 {context}
@@ -630,7 +631,7 @@ INSTRUCTIONS:
 2. If context contains relevant information, provide a clear, detailed answer
 3. If context doesn't contain enough information, say "I don't have enough information in the course materials to answer this question"
 4. Be educational and helpful
-5. Reference specific parts of the context when possible
+5. Do not mention sources, page numbers, or chunk references
 6. Keep answers concise (2-3 paragraphs maximum)
 
 Answer:"""

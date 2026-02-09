@@ -132,15 +132,6 @@ class TeacherDrawer extends ConsumerWidget {
           ),
           _buildDrawerItem(
             context,
-            icon: Icons.psychology,
-            title: 'AI Content Management',
-            onTap: () {
-              Navigator.pop(context);
-              context.go('/teacher/rag-content');
-            },
-          ),
-          _buildDrawerItem(
-            context,
             icon: Icons.notifications,
             title: 'Notifications',
             onTap: () {

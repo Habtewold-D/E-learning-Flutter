@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
+import asyncio
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models.user import User, UserRole
 from app.models.course import Course, CourseContent, ContentType, Enrollment, ContentProgress, EnrollmentStatus
 from app.schemas.course import (
@@ -21,11 +22,21 @@ from app.schemas.course import (
 )
 from app.api.dependencies import get_current_user
 from app.services.file_service import save_uploaded_file
+from app.services.rag_service import RAGService
 import os
 from app.core.config import settings
 from app.services.notification_service import notify_users
 
 router = APIRouter()
+
+
+def _run_indexing_task(content_id: int) -> None:
+    db = SessionLocal()
+    try:
+        rag_service = RAGService(db)
+        asyncio.run(rag_service.process_uploaded_content(content_id))
+    finally:
+        db.close()
 
 
 @router.post("/", response_model=CourseResponse)
@@ -196,7 +207,8 @@ async def upload_content(
     title: str = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = None
 ):
     """Upload course content (video or PDF)."""
     course = db.query(Course).filter(Course.id == course_id).first()
@@ -235,6 +247,10 @@ async def upload_content(
     db.add(new_content)
     db.commit()
     db.refresh(new_content)
+
+    # Automatically index PDF content for RAG
+    if content_type == ContentType.PDF and background_tasks is not None:
+        background_tasks.add_task(_run_indexing_task, new_content.id)
 
     try:
         approved_students = (
