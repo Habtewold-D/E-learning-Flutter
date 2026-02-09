@@ -99,11 +99,22 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
       // Use real RAG service
       final apiClient = ApiClient();
       final ragService = RAGService(apiClient);
+      final threadMap = ref.read(ragThreadIdByCourseProvider);
+      final threadId = threadMap[widget.courseId];
       
       final result = await ragService.askQuestion(
         courseId: widget.courseId,
         question: question,
+        threadId: threadId,
       );
+
+      final newThreadId = result['thread_id']?.toString();
+      if (newThreadId != null && newThreadId.isNotEmpty) {
+        ref.read(ragThreadIdByCourseProvider.notifier).state = {
+          ...threadMap,
+          widget.courseId: newThreadId,
+        };
+      }
 
       final answer = result['answer']?.toString() ?? '';
       final confidence = (result['confidence'] as num?)?.toDouble();
@@ -265,7 +276,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                                   : assistantText,
                         ),
                       ),
-                      if (message.confidence != null && !message.isUser) ...[
+                      if (message.confidence != null && !message.isUser && message.confidence! > 0) ...[
                         const SizedBox(height: 8),
                         _buildConfidenceIndicator(message.confidence!),
                       ],
@@ -451,7 +462,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   Widget _buildHistoryView() {
     return Consumer(
       builder: (context, ref, child) {
-        final queryHistoryAsync = ref.watch(queryHistoryProvider(widget.courseId));
+        final queryHistoryAsync = ref.watch(threadHistoryProvider(widget.courseId));
         
         return queryHistoryAsync.when(
           data: (history) {
@@ -495,27 +506,19 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
                     title: Text(
-                      item.question,
+                      item.title,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
-                      item.answer.length > 100 
-                          ? '${item.answer.substring(0, 100)}...'
-                          : item.answer,
+                      item.lastQuestion.isNotEmpty
+                          ? item.lastQuestion
+                          : item.lastAnswer,
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                     trailing: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '${(item.confidence * 100).toInt()}%',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _getConfidenceColor(item.confidence),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
                         Text(
                           item.formattedDate,
                           style: TextStyle(
@@ -525,28 +528,37 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
                         ),
                       ],
                     ),
-                    onTap: () {
-                      final messages = ref.read(chatMessagesByCourseProvider.notifier);
-                      messages.state = {
-                        ...messages.state,
-                        widget.courseId: [
-                          {
-                            'text': item.question,
-                            'isUser': true,
-                            'timestamp': item.createdAt,
-                            'confidence': null,
-                            'sources': null,
-                            'isError': false,
-                          },
-                          {
-                            'text': item.answer,
-                            'isUser': false,
-                            'timestamp': item.createdAt,
-                            'confidence': item.confidence,
-                            'sources': item.sources,
-                            'isError': false,
-                          },
-                        ],
+                    onTap: () async {
+                      final ragService = ref.read(ragServiceProvider);
+                      final messages = await ragService.getThreadMessages(item.threadId);
+                      final rebuilt = <Map<String, dynamic>>[];
+                      for (final msg in messages) {
+                        final threadMsg = ThreadMessage.fromJson(msg);
+                        rebuilt.add({
+                          'text': threadMsg.question,
+                          'isUser': true,
+                          'timestamp': threadMsg.createdAt,
+                          'confidence': null,
+                          'sources': null,
+                          'isError': false,
+                        });
+                        rebuilt.add({
+                          'text': threadMsg.answer,
+                          'isUser': false,
+                          'timestamp': threadMsg.createdAt,
+                          'confidence': threadMsg.confidence,
+                          'sources': threadMsg.sources,
+                          'isError': false,
+                        });
+                      }
+
+                      ref.read(chatMessagesByCourseProvider.notifier).state = {
+                        ...ref.read(chatMessagesByCourseProvider),
+                        widget.courseId: rebuilt,
+                      };
+                      ref.read(ragThreadIdByCourseProvider.notifier).state = {
+                        ...ref.read(ragThreadIdByCourseProvider),
+                        widget.courseId: item.threadId,
                       };
                       setState(() {
                         _showHistory = false;

@@ -12,7 +12,9 @@ from app.schemas.rag import (
     QuestionRequest,
     QuestionResponse,
     QueryHistoryResponse,
-    ContentIndexingResponse
+    ContentIndexingResponse,
+    ThreadSummaryResponse,
+    ThreadMessageResponse,
 )
 from pydantic import BaseModel
 
@@ -42,14 +44,17 @@ async def ask_question(
         result = await rag_service.answer_student_question(
             student_id=current_user.id,
             course_id=payload.course_id,
-            question=payload.question
+            question=payload.question,
+            thread_id=payload.thread_id,
+            thread_title=payload.thread_title,
         )
         
         return QuestionResponse(
             answer=result["answer"],
             confidence=result["confidence"],
             sources=result["sources"],
-            response_time_ms=result["response_time_ms"]
+            response_time_ms=result["response_time_ms"],
+            thread_id=result.get("thread_id"),
         )
         
     except Exception as e:
@@ -72,6 +77,36 @@ async def get_query_history(
         
         return [QueryHistoryResponse(**item) for item in history]
         
+    except Exception as e:
+        raise handle_business_exception(e)
+
+
+@router.get("/threads", response_model=List[ThreadSummaryResponse])
+async def list_threads(
+    course_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List conversation threads for a student."""
+    try:
+        rag_service = RAGService(db)
+        threads = rag_service.list_threads(student_id=current_user.id, course_id=course_id)
+        return [ThreadSummaryResponse(**item) for item in threads]
+    except Exception as e:
+        raise handle_business_exception(e)
+
+
+@router.get("/threads/{thread_id}", response_model=List[ThreadMessageResponse])
+async def get_thread_messages(
+    thread_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get messages for a thread."""
+    try:
+        rag_service = RAGService(db)
+        messages = rag_service.get_thread_messages(student_id=current_user.id, thread_id=thread_id)
+        return [ThreadMessageResponse(**item) for item in messages]
     except Exception as e:
         raise handle_business_exception(e)
 

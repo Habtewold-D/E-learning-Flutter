@@ -3,10 +3,10 @@ from app.models.course import Course, CourseContent, ContentType, Enrollment, Co
 from app.models.exam import Exam, Question, Result
 from app.models.live_class import LiveClass, LiveClassStatus
 from app.models.notification import NotificationToken, InAppNotification
-from app.models.rag import DocumentChunk, StudentQuery, VectorIndex
+from app.models.rag import DocumentChunk, StudentQuery, VectorIndex, RagThread
 
 __all__ = [
 	"User", "UserRole", "Course", "CourseContent", "ContentType", "Enrollment", "ContentProgress", "EnrollmentStatus",
 	"Exam", "Question", "Result", "LiveClass", "LiveClassStatus", "NotificationToken", "InAppNotification",
-	"DocumentChunk", "StudentQuery", "VectorIndex"
+	"DocumentChunk", "StudentQuery", "VectorIndex", "RagThread"
 ]

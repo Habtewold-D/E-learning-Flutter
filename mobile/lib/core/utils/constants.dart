@@ -41,6 +41,8 @@ class AppConstants {
   // RAG - AI Assistant
   static const String ragAsk = '/rag/ask';
   static const String ragHistory = '/rag/history';
+  static const String ragThreads = '/rag/threads';
+  static const String ragThreadMessages = '/rag/threads/{thread_id}';
   static const String ragIndexStatus = '/rag/index-status/{content_id}';
   static const String ragIndexContent = '/rag/index-content/{content_id}';
 

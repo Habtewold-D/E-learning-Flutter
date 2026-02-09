@@ -12,6 +12,7 @@ class RAGService {
   Future<Map<String, dynamic>> askQuestion({
     required int courseId,
     required String question,
+    String? threadId,
   }) async {
     try {
       final response = await _apiClient.post(
@@ -19,9 +20,36 @@ class RAGService {
         data: {
           'course_id': courseId,
           'question': question,
+          if (threadId != null) 'thread_id': threadId,
         },
       );
       return response.data;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// List conversation threads
+  Future<List<Map<String, dynamic>>> getThreads({int? courseId}) async {
+    try {
+      String url = AppConstants.ragThreads;
+      if (courseId != null) {
+        url += '?course_id=$courseId';
+      }
+      final response = await _apiClient.get(url);
+      return List<Map<String, dynamic>>.from(response.data);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Get messages for a thread
+  Future<List<Map<String, dynamic>>> getThreadMessages(String threadId) async {
+    try {
+      final response = await _apiClient.get(
+        AppConstants.ragThreadMessages.replaceAll('{thread_id}', threadId),
+      );
+      return List<Map<String, dynamic>>.from(response.data);
     } on DioException catch (e) {
       throw _handleError(e);
     }

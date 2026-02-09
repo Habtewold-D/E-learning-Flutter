@@ -7,6 +7,8 @@ class QuestionRequest(BaseModel):
     """Request model for asking a question."""
     course_id: int = Field(..., description="ID of the course")
     question: str = Field(..., min_length=2, max_length=1000, description="Student's question")
+    thread_id: Optional[str] = Field(default=None, description="Existing thread id")
+    thread_title: Optional[str] = Field(default=None, description="Optional thread title for new thread")
 
 
 class QuestionResponse(BaseModel):
@@ -15,6 +17,7 @@ class QuestionResponse(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
     sources: List[Dict[str, Any]] = Field(default_factory=list, description="Source materials used")
     response_time_ms: int = Field(..., description="Response time in milliseconds")
+    thread_id: Optional[str] = Field(default=None, description="Thread id")
 
 
 class QueryHistoryResponse(BaseModel):
@@ -26,6 +29,25 @@ class QueryHistoryResponse(BaseModel):
     response_time_ms: int
     created_at: str
     sources: List[Dict[str, Any]]
+
+
+class ThreadSummaryResponse(BaseModel):
+    """Thread list response."""
+    thread_id: str
+    course_id: int
+    title: str
+    last_question: str
+    last_answer: str
+    updated_at: str
+
+
+class ThreadMessageResponse(BaseModel):
+    """Messages for a thread."""
+    question: str
+    answer: str
+    confidence: float
+    sources: List[Dict[str, Any]]
+    created_at: str
 
 
 class ContentIndexingResponse(BaseModel):

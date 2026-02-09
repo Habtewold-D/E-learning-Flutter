@@ -1,42 +1,34 @@
-class QueryHistoryItem {
-  final int id;
-  final String question;
-  final String answer;
-  final double confidence;
-  final DateTime createdAt;
+class ThreadSummary {
+  final String threadId;
   final int courseId;
-  final String courseTitle;
-  final List<Map<String, dynamic>> sources;
+  final String title;
+  final String lastQuestion;
+  final String lastAnswer;
+  final DateTime updatedAt;
 
-  QueryHistoryItem({
-    required this.id,
-    required this.question,
-    required this.answer,
-    required this.confidence,
-    required this.createdAt,
+  ThreadSummary({
+    required this.threadId,
     required this.courseId,
-    required this.courseTitle,
-    required this.sources,
+    required this.title,
+    required this.lastQuestion,
+    required this.lastAnswer,
+    required this.updatedAt,
   });
 
-  factory QueryHistoryItem.fromJson(Map<String, dynamic> json) {
-    return QueryHistoryItem(
-      id: json['id'] ?? 0,
-      question: json['question'] ?? '',
-      answer: json['answer'] ?? '',
-      confidence: (json['confidence'] ?? 0.0).toDouble(),
-      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
+  factory ThreadSummary.fromJson(Map<String, dynamic> json) {
+    return ThreadSummary(
+      threadId: json['thread_id'] ?? '',
       courseId: json['course_id'] ?? 0,
-      courseTitle: json['course_title'] ?? 'Unknown Course',
-      sources: json['sources'] is List
-          ? List<Map<String, dynamic>>.from(json['sources'] as List)
-          : [],
+      title: json['title'] ?? 'Conversation',
+      lastQuestion: json['last_question'] ?? '',
+      lastAnswer: json['last_answer'] ?? '',
+      updatedAt: DateTime.parse(json['updated_at'] ?? DateTime.now().toIso8601String()),
     );
   }
 
   String get formattedDate {
     final now = DateTime.now();
-    final difference = now.difference(createdAt);
+    final difference = now.difference(updatedAt);
 
     if (difference.inDays > 0) {
       return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
@@ -47,5 +39,33 @@ class QueryHistoryItem {
     } else {
       return 'Just now';
     }
+  }
+}
+
+class ThreadMessage {
+  final String question;
+  final String answer;
+  final double confidence;
+  final DateTime createdAt;
+  final List<Map<String, dynamic>> sources;
+
+  ThreadMessage({
+    required this.question,
+    required this.answer,
+    required this.confidence,
+    required this.createdAt,
+    required this.sources,
+  });
+
+  factory ThreadMessage.fromJson(Map<String, dynamic> json) {
+    return ThreadMessage(
+      question: json['question'] ?? '',
+      answer: json['answer'] ?? '',
+      confidence: (json['confidence'] ?? 0.0).toDouble(),
+      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
+      sources: json['sources'] is List
+          ? List<Map<String, dynamic>>.from(json['sources'] as List)
+          : [],
+    );
   }
 }

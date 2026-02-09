@@ -4,6 +4,23 @@ from sqlalchemy.sql import func
 from app.core.database import Base
 
 
+class RagThread(Base):
+    """Conversation thread for RAG chat."""
+
+    __tablename__ = "rag_threads"
+
+    id = Column(String(36), primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    title = Column(String, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    student = relationship("User")
+    course = relationship("Course")
+    queries = relationship("StudentQuery", back_populates="thread", cascade="all, delete-orphan")
+
+
 class DocumentChunk(Base):
     """Represents a chunk of processed document content for RAG."""
     
@@ -29,6 +46,7 @@ class StudentQuery(Base):
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    thread_id = Column(String(36), ForeignKey("rag_threads.id"), nullable=True)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)
     context_chunks = Column(JSON, nullable=True)  # Retrieved chunks used
@@ -39,6 +57,7 @@ class StudentQuery(Base):
     # Relationships
     student = relationship("User")
     course = relationship("Course")
+    thread = relationship("RagThread", back_populates="queries")
 
 
 class VectorIndex(Base):

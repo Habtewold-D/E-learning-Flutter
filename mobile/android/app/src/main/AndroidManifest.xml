@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <application
+        android:enableOnBackInvokedCallback="true"
         android:label="E-Learning"
         android:name="${applicationName}"
         android:icon="@drawable/ic_launcher"

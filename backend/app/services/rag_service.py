@@ -8,7 +8,7 @@ import io
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.course import CourseContent, ContentType
-from app.models.rag import DocumentChunk, StudentQuery, VectorIndex
+from app.models.rag import DocumentChunk, StudentQuery, VectorIndex, RagThread
 from sqlalchemy.sql import func
 from app.core.exceptions import ValidationError, NotFoundError
 import logging
@@ -196,23 +196,69 @@ class RAGService:
         
         return embedding[:384]
     
+    def _get_or_create_thread(
+        self,
+        student_id: int,
+        course_id: int,
+        thread_id: Optional[str],
+        thread_title: Optional[str],
+        seed_question: str,
+    ) -> RagThread:
+        if thread_id:
+            thread = (
+                self.db.query(RagThread)
+                .filter(RagThread.id == thread_id)
+                .filter(RagThread.student_id == student_id)
+                .filter(RagThread.course_id == course_id)
+                .first()
+            )
+            if not thread:
+                raise ValidationError("Invalid thread id")
+            return thread
+
+        import uuid
+        title = (thread_title or seed_question).strip()
+        if len(title) > 60:
+            title = title[:57] + "..."
+
+        thread = RagThread(
+            id=str(uuid.uuid4()),
+            student_id=student_id,
+            course_id=course_id,
+            title=title or "New conversation",
+        )
+        self.db.add(thread)
+        self.db.commit()
+        self.db.refresh(thread)
+        return thread
+
     async def answer_student_question(
         self,
         student_id: int,
         course_id: int,
-        question: str
+        question: str,
+        thread_id: Optional[str] = None,
+        thread_title: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Answer student question using RAG."""
         import time
         start_time = time.time()
 
         normalized = question.strip().lower()
+        thread = self._get_or_create_thread(
+            student_id=student_id,
+            course_id=course_id,
+            thread_id=thread_id,
+            thread_title=thread_title,
+            seed_question=question,
+        )
         if len(normalized.split()) <= 2 or normalized in {"hi", "hello", "hey", "thanks", "thank you"}:
             return {
                 "answer": "Hi! Ask me a specific question from the course materials and I’ll answer it.",
                 "confidence": 0.0,
                 "sources": [],
                 "response_time_ms": int((time.time() - start_time) * 1000),
+                "thread_id": thread.id,
             }
         
         try:
@@ -244,6 +290,7 @@ class RAGService:
             query_record = StudentQuery(
                 student_id=student_id,
                 course_id=course_id,
+                thread_id=thread.id,
                 question=question,
                 answer=answer,
                 context_chunks=[chunk["metadata"] for chunk in relevant_chunks],
@@ -251,13 +298,15 @@ class RAGService:
                 response_time_ms=response_time
             )
             self.db.add(query_record)
+            thread.updated_at = func.now()
             self.db.commit()
             
             return {
                 "answer": answer,
                 "confidence": query_record.confidence_score,
                 "sources": [chunk["metadata"] for chunk in relevant_chunks],
-                "response_time_ms": response_time
+                "response_time_ms": response_time,
+                "thread_id": thread.id,
             }
             
         except Exception as e:
@@ -267,6 +316,60 @@ class RAGService:
                 "confidence": 0.0,
                 "sources": []
             }
+
+    def list_threads(self, student_id: int, course_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        query = self.db.query(RagThread).filter(RagThread.student_id == student_id)
+        if course_id:
+            query = query.filter(RagThread.course_id == course_id)
+        threads = query.order_by(RagThread.updated_at.desc()).all()
+
+        results = []
+        for thread in threads:
+            last_query = (
+                self.db.query(StudentQuery)
+                .filter(StudentQuery.thread_id == thread.id)
+                .order_by(StudentQuery.created_at.desc())
+                .first()
+            )
+            results.append(
+                {
+                    "thread_id": thread.id,
+                    "course_id": thread.course_id,
+                    "title": thread.title,
+                    "last_question": last_query.question if last_query else "",
+                    "last_answer": last_query.answer if last_query else "",
+                    "updated_at": (last_query.created_at if last_query else thread.updated_at).isoformat(),
+                }
+            )
+        return results
+
+    def get_thread_messages(self, student_id: int, thread_id: str) -> List[Dict[str, Any]]:
+        thread = (
+            self.db.query(RagThread)
+            .filter(RagThread.id == thread_id)
+            .filter(RagThread.student_id == student_id)
+            .first()
+        )
+        if not thread:
+            raise NotFoundError("Thread not found")
+
+        queries = (
+            self.db.query(StudentQuery)
+            .filter(StudentQuery.thread_id == thread_id)
+            .order_by(StudentQuery.created_at.asc())
+            .all()
+        )
+
+        return [
+            {
+                "question": q.question,
+                "answer": q.answer,
+                "confidence": q.confidence_score or 0.0,
+                "sources": q.context_chunks or [],
+                "created_at": q.created_at.isoformat(),
+            }
+            for q in queries
+        ]
     
     async def _retrieve_relevant_chunks(self, course_id: int, question: str, top_k: int = 2) -> List[Dict[str, Any]]:
         """Retrieve most relevant chunks for a question."""

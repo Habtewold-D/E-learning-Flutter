@@ -11,12 +11,15 @@ final ragServiceProvider = Provider<RAGService>((ref) {
 // Provider for current chat messages (per course)
 final chatMessagesByCourseProvider = StateProvider<Map<int, List<Map<String, dynamic>>>>((ref) => {});
 
+// Provider for current thread id (per course)
+final ragThreadIdByCourseProvider = StateProvider<Map<int, String?>>((ref) => {});
+
 // Provider for loading state
 final chatLoadingProvider = StateProvider<bool>((ref) => false);
 
 // Provider for query history
-final queryHistoryProvider = FutureProvider.family<List<QueryHistoryItem>, int>((ref, courseId) async {
+final threadHistoryProvider = FutureProvider.family<List<ThreadSummary>, int>((ref, courseId) async {
   final ragService = ref.read(ragServiceProvider);
-  final history = await ragService.getQueryHistory(courseId: courseId);
-  return history.map((item) => QueryHistoryItem.fromJson(item)).toList();
+  final threads = await ragService.getThreads(courseId: courseId);
+  return threads.map((item) => ThreadSummary.fromJson(item)).toList();
 });
