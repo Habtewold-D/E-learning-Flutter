@@ -25,9 +25,13 @@ aiofiles==23.2.1
 python-magic==0.4.27
 cloudinary==1.39.0
 
-# RAG System - Simplified for Groq
+# RAG System - Groq + Sentence Transformers + ChromaDB
 PyPDF2==3.0.1
-numpy==1.24.3
+numpy>=1.21.0
+sentence-transformers==2.2.2
+huggingface_hub==0.20.3
+torch>=2.2.0
+chromadb==0.4.15
 
 # Rate Limiting
 slowapi==0.1.9
