@@ -59,11 +59,12 @@ class RAGService:
             logger.info(f"Available memory before model load: {memory_before:.2f}GB")
             
             # Choose model based on available memory
-            if memory_before < 1.0:  # Less than 1GB available
-                logger.warning("Low memory detected, using smaller model")
-                model_name = 'sentence-transformers/paraphrase-MiniLM-L3-v2'
+            if memory_before < 1.5:  # Less than 1.5GB available
+                logger.warning("Low memory detected, using ultra-small model")
+                model_name = 'sentence-transformers/all-MiniLM-L6-v2'  # 90MB model
             else:
-                model_name = 'sentence-transformers/all-MiniLM-L6-v2'
+                logger.info("Sufficient memory, using standard model")
+                model_name = 'sentence-transformers/all-MiniLM-L6-v2'  # Same model
             
             logger.info(f"Loading sentence transformer model: {model_name}")
             model_path = self._ensure_local_model(model_name)
@@ -363,12 +364,12 @@ class RAGService:
             except:
                 pass  # Collection might not exist yet
             
-            # Store in ChromaDB in batches to reduce memory
-            batch_size = 16
+            # Store in ChromaDB in smaller batches to reduce memory
+            batch_size = 8  # Reduced from 16 for 512MB limit
             for start in range(0, len(chunks), batch_size):
                 end = min(start + batch_size, len(chunks))
                 batch_texts = texts[start:end]
-                batch_embeddings = model.encode(batch_texts, batch_size=16, show_progress_bar=False)
+                batch_embeddings = model.encode(batch_texts, batch_size=8, show_progress_bar=False)  # Match batch_size
                 batch_ids = [f"{content_id}_{i}" for i in range(start, end)]
                 batch_metadatas = [
                     {
@@ -385,6 +386,10 @@ class RAGService:
                     metadatas=batch_metadatas,
                     ids=batch_ids,
                 )
+                
+                # Log memory usage per batch
+                current_memory = psutil.virtual_memory().available / (1024 * 1024 * 1024)
+                logger.info(f"Batch {start//batch_size + 1}: Memory available: {current_memory:.2f}GB")
             
             logger.info(f"Stored {len(chunks)} chunks in ChromaDB for content {content_id}")
             
