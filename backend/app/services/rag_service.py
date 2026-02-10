@@ -14,22 +14,24 @@ from app.models.rag import StudentQuery, VectorIndex, RagThread
 from sqlalchemy.sql import func
 from app.core.exceptions import ValidationError, NotFoundError
 import logging
+
+# Memory optimization settings - must be set BEFORE model imports
+os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", os.path.abspath("./model_cache"))
+os.environ.setdefault("HF_HOME", os.path.abspath("./model_cache"))
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.path.abspath("./model_cache"))
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("ONNXRUNTIME_DISABLE", "1")
+os.environ.setdefault("DISABLE_OPENVINO", "1")
+os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "")
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+from huggingface_hub import snapshot_download
 from sentence_transformers import SentenceTransformer
 
 # Global singleton for embedding model - TRULY shared across all instances
 _GLOBAL_EMBEDDING_MODEL = None
-
-# Memory optimization settings - AGGRESSIVE
-os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", os.path.abspath("./model_cache"))
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-os.environ.setdefault("ONNXRUNTIME_DISABLE", "1")
-os.environ.setdefault("DISABLE_OPENVINO", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")  # Force offline mode
-os.environ.setdefault("HF_HUB_OFFLINE", "1")  # HuggingFace offline
-os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "")  # Disable CUDA
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")  # No GPU
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,10 @@ class RAGService:
     def __init__(self, db: Session):
         self.db = db
         # Initialize ChromaDB client with persistence
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        self.chroma_client = chromadb.PersistentClient(
+            path="./chroma_db",
+            settings=ChromaSettings(anonymized_telemetry=False),
+        )
         self.collection = self.chroma_client.get_or_create_collection("course_content")
         
         # Load sentence transformer model once (TRUE global singleton) with memory optimization
@@ -58,7 +63,8 @@ class RAGService:
                 model_name = 'all-MiniLM-L6-v2'  # Standard model
             
             logger.info(f"Loading sentence transformer model: {model_name}")
-            _GLOBAL_EMBEDDING_MODEL = SentenceTransformer(model_name)
+            model_path = self._ensure_local_model(model_name)
+            _GLOBAL_EMBEDDING_MODEL = SentenceTransformer(model_path)
             
             # Check memory after loading
             memory_after = psutil.virtual_memory().available / (1024 * 1024 * 1024)  # GB
@@ -72,6 +78,37 @@ class RAGService:
     def get_embedding_model(cls):
         """Get singleton embedding model instance."""
         return _GLOBAL_EMBEDDING_MODEL
+
+    @staticmethod
+    def _ensure_local_model(model_name: str) -> str:
+        """Download only required model files (exclude ONNX/OpenVINO) and return local path."""
+        cache_root = os.path.abspath("./model_cache")
+        local_dir = os.path.join(cache_root, "sentence_transformers", model_name.replace("/", "__"))
+        if not Path(local_dir).exists():
+            Path(local_dir).mkdir(parents=True, exist_ok=True)
+            snapshot_download(
+                repo_id=model_name,
+                local_dir=local_dir,
+                local_dir_use_symlinks=False,
+                allow_patterns=[
+                    "*.json",
+                    "*.txt",
+                    "model.safetensors",  # ONLY the main model
+                    "pytorch_model.bin",  # ONLY PyTorch format
+                    "*.model",  # Tokenizer files
+                    "vocab.txt",
+                    "tokenizer.json",
+                ],
+                ignore_patterns=[
+                    "*.onnx",  # Exclude ALL ONNX files
+                    "*_O*.onnx",  # Exclude quantized ONNX
+                    "*_quantized*",  # Exclude quantized models
+                    "openvino_*",  # Exclude OpenVINO files
+                    "*_int8*",  # Exclude quantized versions
+                ],
+                resume_download=True,
+            )
+        return local_dir
         
     async def process_uploaded_content(self, content_id: int) -> Dict[str, Any]:
         """Process uploaded content for RAG indexing."""
@@ -308,18 +345,6 @@ class RAGService:
             # Generate embeddings using singleton model
             model = self.get_embedding_model()
             texts = [chunk_data["text"] for chunk_data in chunks]
-            embeddings = model.encode(texts)
-            
-            # Prepare data for ChromaDB with course_id in metadata
-            ids = [f"{content_id}_{i}" for i in range(len(chunks))]
-            metadatas = [
-                {
-                    **chunk_data["metadata"],
-                    "course_id": str(course_id),
-                    "content_id": str(content_id),
-                }
-                for chunk_data in chunks
-            ]
             
             # Clear existing content from ChromaDB to avoid duplicates - FIXED deletion
             try:
@@ -335,13 +360,28 @@ class RAGService:
             except:
                 pass  # Collection might not exist yet
             
-            # Store in ChromaDB
-            self.collection.add(
-                documents=texts,
-                embeddings=embeddings.tolist(),
-                metadatas=metadatas,
-                ids=ids
-            )
+            # Store in ChromaDB in batches to reduce memory
+            batch_size = 16
+            for start in range(0, len(chunks), batch_size):
+                end = min(start + batch_size, len(chunks))
+                batch_texts = texts[start:end]
+                batch_embeddings = model.encode(batch_texts, batch_size=16, show_progress_bar=False)
+                batch_ids = [f"{content_id}_{i}" for i in range(start, end)]
+                batch_metadatas = [
+                    {
+                        **chunks[i]["metadata"],
+                        "course_id": str(course_id),
+                        "content_id": str(content_id),
+                    }
+                    for i in range(start, end)
+                ]
+
+                self.collection.add(
+                    documents=batch_texts,
+                    embeddings=batch_embeddings.tolist(),
+                    metadatas=batch_metadatas,
+                    ids=batch_ids,
+                )
             
             logger.info(f"Stored {len(chunks)} chunks in ChromaDB for content {content_id}")
             
