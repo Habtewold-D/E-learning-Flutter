@@ -16,9 +16,10 @@ from app.core.exceptions import ValidationError, NotFoundError
 import logging
 
 # Memory optimization settings - must be set BEFORE model imports
-os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", os.path.abspath("./model_cache"))
-os.environ.setdefault("HF_HOME", os.path.abspath("./model_cache"))
-os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.path.abspath("./model_cache"))
+_CACHE_ROOT = os.path.abspath(os.getenv("MODEL_CACHE_DIR", "./model_cache"))
+os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", _CACHE_ROOT)
+os.environ.setdefault("HF_HOME", _CACHE_ROOT)
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", _CACHE_ROOT)
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
 os.environ.setdefault("CHROMA_TELEMETRY", "false")
@@ -58,11 +59,11 @@ class RAGService:
             logger.info(f"Available memory before model load: {memory_before:.2f}GB")
             
             # Choose model based on available memory
-            if memory_before < 0.3:  # Less than 300MB available
-                logger.warning("Low memory detected, using minimal model")
-                model_name = 'sentence-transformers/all-MiniLM-L6-v2'  # Smallest model
+            if memory_before < 1.0:  # Less than 1GB available
+                logger.warning("Low memory detected, using smaller model")
+                model_name = 'sentence-transformers/paraphrase-MiniLM-L3-v2'
             else:
-                model_name = 'sentence-transformers/all-MiniLM-L6-v2'  # Standard model
+                model_name = 'sentence-transformers/all-MiniLM-L6-v2'
             
             logger.info(f"Loading sentence transformer model: {model_name}")
             model_path = self._ensure_local_model(model_name)
@@ -84,7 +85,7 @@ class RAGService:
     @staticmethod
     def _ensure_local_model(model_name: str) -> str:
         """Download only required model files (exclude ONNX/OpenVINO) and return local path."""
-        cache_root = os.path.abspath("./model_cache")
+        cache_root = _CACHE_ROOT
         local_dir = os.path.join(cache_root, "sentence_transformers", model_name.replace("/", "__"))
         config_path = Path(local_dir) / "config.json"
         if not config_path.exists():
@@ -96,8 +97,7 @@ class RAGService:
                 allow_patterns=[
                     "*.json",
                     "*.txt",
-                    "model.safetensors",  # ONLY the main model
-                    "pytorch_model.bin",  # ONLY PyTorch format
+                    "model.safetensors",  # ONLY the main model (safetensors)
                     "*.model",  # Tokenizer files
                     "vocab.txt",
                     "tokenizer.json",
