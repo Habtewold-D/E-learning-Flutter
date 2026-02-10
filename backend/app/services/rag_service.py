@@ -23,6 +23,8 @@ os.environ.setdefault("HUGGINGFACE_HUB_CACHE", _CACHE_ROOT)
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
 os.environ.setdefault("CHROMA_TELEMETRY", "false")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("ONNXRUNTIME_DISABLE", "1")
 os.environ.setdefault("DISABLE_OPENVINO", "1")
 os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "")
@@ -89,6 +91,8 @@ class RAGService:
         local_dir = os.path.join(cache_root, "sentence_transformers", model_name.replace("/", "__"))
         config_path = Path(local_dir) / "config.json"
         if not config_path.exists():
+            if os.getenv("HF_HUB_OFFLINE", "0") == "1":
+                raise ValidationError("Model cache is missing. Bundle model files in backend/model_cache before deploy.")
             Path(local_dir).mkdir(parents=True, exist_ok=True)
             snapshot_download(
                 repo_id=model_name,
