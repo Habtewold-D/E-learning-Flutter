@@ -32,7 +32,6 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-from huggingface_hub import snapshot_download
 from sentence_transformers import SentenceTransformer
 
 # Global singleton for embedding model - TRULY shared across all instances
@@ -91,29 +90,8 @@ class RAGService:
         local_dir = os.path.join(cache_root, "sentence_transformers", model_name.replace("/", "__"))
         config_path = Path(local_dir) / "config.json"
         if not config_path.exists():
-            if os.getenv("HF_HUB_OFFLINE", "0") == "1":
-                raise ValidationError("Model cache is missing. Bundle model files in backend/model_cache before deploy.")
-            Path(local_dir).mkdir(parents=True, exist_ok=True)
-            snapshot_download(
-                repo_id=model_name,
-                local_dir=local_dir,
-                local_dir_use_symlinks=False,
-                allow_patterns=[
-                    "*.json",
-                    "*.txt",
-                    "model.safetensors",  # ONLY the main model (safetensors)
-                    "*.model",  # Tokenizer files
-                    "vocab.txt",
-                    "tokenizer.json",
-                ],
-                ignore_patterns=[
-                    "*.onnx",  # Exclude ALL ONNX files
-                    "*_O*.onnx",  # Exclude quantized ONNX
-                    "*_quantized*",  # Exclude quantized models
-                    "openvino_*",  # Exclude OpenVINO files
-                    "*_int8*",  # Exclude quantized versions
-                ],
-                resume_download=True,
+            raise ValidationError(
+                "Model cache is missing. Download the model locally into backend/model_cache and redeploy."
             )
         return local_dir
         
