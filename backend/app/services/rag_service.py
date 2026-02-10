@@ -20,6 +20,8 @@ os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", os.path.abspath("./model_cac
 os.environ.setdefault("HF_HOME", os.path.abspath("./model_cache"))
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.path.abspath("./model_cache"))
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
+os.environ.setdefault("CHROMA_TELEMETRY", "false")
 os.environ.setdefault("ONNXRUNTIME_DISABLE", "1")
 os.environ.setdefault("DISABLE_OPENVINO", "1")
 os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "")
@@ -58,9 +60,9 @@ class RAGService:
             # Choose model based on available memory
             if memory_before < 0.3:  # Less than 300MB available
                 logger.warning("Low memory detected, using minimal model")
-                model_name = 'all-MiniLM-L6-v2'  # Smallest model
+                model_name = 'sentence-transformers/all-MiniLM-L6-v2'  # Smallest model
             else:
-                model_name = 'all-MiniLM-L6-v2'  # Standard model
+                model_name = 'sentence-transformers/all-MiniLM-L6-v2'  # Standard model
             
             logger.info(f"Loading sentence transformer model: {model_name}")
             model_path = self._ensure_local_model(model_name)
@@ -84,7 +86,8 @@ class RAGService:
         """Download only required model files (exclude ONNX/OpenVINO) and return local path."""
         cache_root = os.path.abspath("./model_cache")
         local_dir = os.path.join(cache_root, "sentence_transformers", model_name.replace("/", "__"))
-        if not Path(local_dir).exists():
+        config_path = Path(local_dir) / "config.json"
+        if not config_path.exists():
             Path(local_dir).mkdir(parents=True, exist_ok=True)
             snapshot_download(
                 repo_id=model_name,

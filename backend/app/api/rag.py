@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 import asyncio
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime, timedelta
 from app.core.database import get_db, SessionLocal
 from app.models.user import User
 from app.api.dependencies import get_current_user
@@ -17,6 +18,8 @@ from app.schemas.rag import (
     ThreadMessageResponse,
 )
 from pydantic import BaseModel
+import chromadb
+from chromadb.config import Settings as ChromaSettings
 
 router = APIRouter()
 
@@ -192,6 +195,34 @@ async def get_index_status(
             return {"content_id": content_id, "status": "not_indexed", "chunks_created": 0}
         
         status_map = {0: "not_indexed", 1: "indexing", 2: "completed"}
+
+        # If stuck in indexing, verify in ChromaDB and auto-fix status
+        if vector_index.is_indexed == 1:
+            try:
+                chroma_client = chromadb.PersistentClient(
+                    path="./chroma_db",
+                    settings=ChromaSettings(anonymized_telemetry=False),
+                )
+                collection = chroma_client.get_or_create_collection("course_content")
+                results = collection.get(where={"content_id": {"$eq": str(content_id)}})
+                ids = results.get("ids", []) if isinstance(results, dict) else []
+
+                if ids:
+                    vector_index.is_indexed = 2
+                    vector_index.chunk_count = len(ids)
+                    vector_index.last_updated = func.now()
+                    vector_index.error_message = None
+                    db.commit()
+                else:
+                    # If indexing has been stuck too long, mark as failed
+                    if vector_index.last_updated and vector_index.last_updated < datetime.utcnow() - timedelta(minutes=20):
+                        vector_index.is_indexed = 0
+                        vector_index.error_message = "Indexing timed out. Please retry."
+                        vector_index.last_updated = func.now()
+                        db.commit()
+            except Exception:
+                # Keep current status if Chroma check fails
+                pass
         
         return {
             "content_id": content_id,
