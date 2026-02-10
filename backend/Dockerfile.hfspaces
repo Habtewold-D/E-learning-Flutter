@@ -1,0 +1,36 @@
+# Use Python 3.11 for HF Spaces
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create model cache directory
+RUN mkdir -p ./model_cache
+
+# Set environment variables for memory optimization
+ENV SENTENCE_TRANSFORMERS_HOME=./model_cache
+ENV HF_HOME=./model_cache
+ENV TOKENIZERS_PARALLELISM=false
+ENV ONNXRUNTIME_DISABLE=1
+ENV DISABLE_OPENVINO=1
+
+# Expose port (HF Spaces uses 7860)
+EXPOSE 7860
+
+# Run the application with HF Spaces port
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
