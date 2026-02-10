@@ -29,8 +29,7 @@ cloudinary==1.39.0
 PyPDF2==3.0.1
 numpy>=1.21.0
 sentence-transformers==2.2.2
-huggingface_hub==0.20.3
-torch>=2.2.0
+torch==2.2.0+cpu
 chromadb==0.4.15
 psutil==5.9.0
 
