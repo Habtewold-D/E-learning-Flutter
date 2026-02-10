@@ -53,34 +53,33 @@ class RAGService:
         
         # Load sentence transformer model once (TRUE global singleton) with memory optimization
         global _GLOBAL_EMBEDDING_MODEL
+        # DON'T load model on startup - defer to first use to avoid memory crashes
+        logger.info("RAGService initialized - model will be loaded on first use")
+        logger.info(f"Available memory: {psutil.virtual_memory().available / (1024 * 1024 * 1024):.2f}GB")
+
+    @classmethod
+    def get_embedding_model(cls):
+        """Get singleton embedding model instance with lazy loading."""
+        global _GLOBAL_EMBEDDING_MODEL
         if _GLOBAL_EMBEDDING_MODEL is None:
-            # Check available memory before loading
+            # Load model only when first requested
             memory_before = psutil.virtual_memory().available / (1024 * 1024 * 1024)  # GB
-            logger.info(f"Available memory before model load: {memory_before:.2f}GB")
+            logger.info(f"LAZY LOADING - Available memory: {memory_before:.2f}GB")
             
-            # Choose model based on available memory
-            if memory_before < 1.5:  # Less than 1.5GB available
-                logger.warning("Low memory detected, using ultra-small model")
-                model_name = 'sentence-transformers/all-MiniLM-L6-v2'  # 90MB model
-            else:
-                logger.info("Sufficient memory, using standard model")
-                model_name = 'sentence-transformers/all-MiniLM-L6-v2'  # Same model
+            # Always use the smallest model for 512MB limit
+            logger.warning("Using ultra-small model for 512MB memory limit")
+            model_name = 'sentence-transformers/all-MiniLM-L6-v2'
             
             logger.info(f"Loading sentence transformer model: {model_name}")
-            model_path = self._ensure_local_model(model_name)
+            model_path = cls._ensure_local_model(model_name)
             _GLOBAL_EMBEDDING_MODEL = SentenceTransformer(model_path)
             
             # Check memory after loading
             memory_after = psutil.virtual_memory().available / (1024 * 1024 * 1024)  # GB
             memory_used = memory_before - memory_after
-            logger.info(f"Memory used by model: {memory_used:.2f}GB")
+            logger.info(f"Model loaded - Memory used: {memory_used:.2f}GB")
             logger.info(f"Available memory after load: {memory_after:.2f}GB")
-        else:
-            logger.info("Reusing existing sentence transformer model")
-
-    @classmethod
-    def get_embedding_model(cls):
-        """Get singleton embedding model instance."""
+        
         return _GLOBAL_EMBEDDING_MODEL
 
     @staticmethod
