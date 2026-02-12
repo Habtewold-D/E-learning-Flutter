@@ -37,8 +37,6 @@ from sentence_transformers import SentenceTransformer
 # Global singleton for embedding model - TRULY shared across all instances
 _GLOBAL_EMBEDDING_MODEL = None
 
-logger = logging.getLogger(__name__)
-
 
 class RAGService:
     """Service for RAG (Retrieval-Augmented Generation) functionality using Groq + Sentence Transformers + ChromaDB."""
@@ -55,8 +53,6 @@ class RAGService:
         # Load sentence transformer model once (TRUE global singleton) with memory optimization
         global _GLOBAL_EMBEDDING_MODEL
         # DON'T load model on startup - defer to first use to avoid memory crashes
-        logger.info("RAGService initialized - model will be loaded on first use")
-        logger.info(f"Available memory: {psutil.virtual_memory().available / (1024 * 1024 * 1024):.2f}GB")
 
     @classmethod
     def get_embedding_model(cls):
@@ -64,22 +60,11 @@ class RAGService:
         global _GLOBAL_EMBEDDING_MODEL
         if _GLOBAL_EMBEDDING_MODEL is None:
             # Load model only when first requested
-            memory_before = psutil.virtual_memory().available / (1024 * 1024 * 1024)  # GB
-            logger.info(f"LAZY LOADING - Available memory: {memory_before:.2f}GB")
-            
-            # Always use the smallest model for 512MB limit
-            logger.warning("Using ultra-small model for 512MB memory limit")
+            # Always use smallest model for 512MB limit
             model_name = 'sentence-transformers/all-MiniLM-L6-v2'
             
-            logger.info(f"Loading sentence transformer model: {model_name}")
             model_path = cls._ensure_local_model(model_name)
             _GLOBAL_EMBEDDING_MODEL = SentenceTransformer(model_path)
-            
-            # Check memory after loading
-            memory_after = psutil.virtual_memory().available / (1024 * 1024 * 1024)  # GB
-            memory_used = memory_before - memory_after
-            logger.info(f"Model loaded - Memory used: {memory_used:.2f}GB")
-            logger.info(f"Available memory after load: {memory_after:.2f}GB")
         
         return _GLOBAL_EMBEDDING_MODEL
 
@@ -144,7 +129,6 @@ class RAGService:
             vector_index.is_indexed = 0
             vector_index.error_message = str(e)
             self.db.commit()
-            logger.error(f"Error processing content {content_id}: {str(e)}")
             raise
     
     async def _process_pdf_content(self, content: CourseContent) -> List[Dict[str, Any]]:
@@ -181,7 +165,6 @@ class RAGService:
             return text_chunks
             
         except Exception as e:
-            logger.error(f"Error processing PDF: {str(e)}")
             raise ValidationError(f"Failed to process PDF: {str(e)}")
 
     def _clean_extracted_text(self, text: str) -> str:
@@ -210,7 +193,6 @@ class RAGService:
                 response.raise_for_status()
                 return response.content
         except Exception as e:
-            logger.error(f"Error downloading file: {str(e)}")
             raise ValidationError(f"Failed to download file: {str(e)}")
     
     def _split_text_into_chunks(
@@ -341,7 +323,6 @@ class RAGService:
                 if existing_results and existing_results.get("ids"):
                     # Delete old chunks for this content_id
                     self.collection.delete(ids=existing_results["ids"])
-                    logger.info(f"Deleted {len(existing_results['ids'])} old chunks for content {content_id}")
             except:
                 pass  # Collection might not exist yet
             
@@ -370,12 +351,10 @@ class RAGService:
                 
                 # Log memory usage per batch
                 current_memory = psutil.virtual_memory().available / (1024 * 1024 * 1024)
-                logger.info(f"Batch {start//batch_size + 1}: Memory available: {current_memory:.2f}GB")
             
-            logger.info(f"Stored {len(chunks)} chunks in ChromaDB for content {content_id}")
+            print(f"Stored {len(chunks)} chunks in ChromaDB for content {content_id}")
             
         except Exception as e:
-            logger.error(f"Error storing chunks: {str(e)}")
             raise
     
     def _generate_embedding(self, text: str) -> List[float]:
@@ -384,11 +363,9 @@ class RAGService:
             # Use singleton model instance
             model = self.get_embedding_model()
             embedding = model.encode(text)
-            logger.info(f"Generated embedding with {len(embedding)} dimensions")
             return embedding.tolist()
                     
         except Exception as e:
-            logger.error(f"Error generating embedding: {str(e)}")
             # Fallback to simple embedding
             return self._simple_embedding(text)
     
@@ -519,7 +496,6 @@ class RAGService:
             }
             
         except Exception as e:
-            logger.error(f"Error answering question: {str(e)}")
             return {
                 "answer": "I'm having trouble processing your question right now. Please try again later.",
                 "confidence": 0.0,
@@ -583,8 +559,6 @@ class RAGService:
     async def _retrieve_relevant_chunks(self, course_id: int, question: str, top_k: int = 8) -> List[Dict[str, Any]]:
         """Retrieve most relevant chunks using ChromaDB vector search."""
         try:
-            logger.info(f"Retrieving chunks for course {course_id}, question: '{question[:100]}...'")
-            
             # Generate question embedding using singleton model
             model = self.get_embedding_model()
             question_embedding = model.encode(question)
@@ -595,10 +569,6 @@ class RAGService:
                     n_results=top_k * 2,  # Get more results for filtering
                     where={"course_id": {"$eq": str(course_id)}}  # Proper ChromaDB syntax for exact match
                 )
-                
-                # Debug logging
-                logger.info(f"ChromaDB query returned: {type(results)}")
-                logger.info(f"Available keys: {list(results.keys()) if isinstance(results, dict) else 'Not a dict'}")
                 
                 # Convert ChromaDB results to our format - FIXED PARSING with better error handling
                 scored_chunks = []
@@ -626,22 +596,18 @@ class RAGService:
                             "metadata": metadata
                         })
                 else:
-                    logger.warning(f"Unexpected ChromaDB response structure: {results}")
+                    pass
                     
             except Exception as e:
-                logger.error(f"ChromaDB query failed: {str(e)}")
                 return []
             
             # Sort by similarity and return top_k
             scored_chunks.sort(key=lambda x: x["similarity"], reverse=True)
             final_chunks = scored_chunks[:top_k]
             
-            logger.info(f"Retrieved {len(final_chunks)} relevant chunks from ChromaDB with similarities: {[c['similarity'] for c in final_chunks]}")
-            
             return final_chunks
             
         except Exception as e:
-            logger.error(f"Error retrieving chunks from ChromaDB: {str(e)}")
             return []
     
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
@@ -659,7 +625,6 @@ class RAGService:
             return dot_product / (magnitude1 * magnitude2)
             
         except Exception as e:
-            logger.error(f"Error calculating similarity: {str(e)}")
             return 0.0
     
     async def _generate_answer(self, question: str, context: str) -> str:
@@ -667,13 +632,11 @@ class RAGService:
         try:
             return await self._groq_generate(question, context)
         except Exception as e:
-            logger.error(f"Error generating answer: {str(e)}")
             return self._fallback_answer(question, context)
     
     async def _groq_generate(self, question: str, context: str) -> str:
         """Generate answer using Groq with improved prompt."""
         if not settings.GROQ_API_KEY:
-            logger.warning("GROQ_API_KEY not configured, using fallback answer")
             return self._fallback_answer(question, context)
         
         prompt = f"""You are an expert AI tutor helping students learn from course materials.
@@ -714,14 +677,11 @@ Answer:"""
 
             if response.status_code == 200:
                 answer = response.json()["choices"][0]["message"]["content"]
-                logger.info(f"Generated answer with {len(answer)} characters")
                 return answer
             else:
-                logger.error(f"Groq API error: {response.status_code} - {response.text}")
                 return self._fallback_answer(question, context)
                 
         except Exception as e:
-            logger.error(f"Groq generation error: {str(e)}")
             return self._fallback_answer(question, context)
 
     def _fallback_answer(self, question: str, context: str) -> str:

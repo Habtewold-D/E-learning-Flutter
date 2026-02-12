@@ -1,20 +1,6 @@
 class AppConstants {
-  // ============================================
-  // API BASE URL CONFIGURATION
-  // ============================================
-  // IMPORTANT: Change this IP address to match your backend server's IP
-  // 
-  // To find your IP address:
-  //   Linux/Mac: Run `hostname -I` or `ip addr show` or `ifconfig`
-  //   Windows: Run `ipconfig` and look for IPv4 Address
-  //
-  // Common configurations:
-  //   - Android Emulator: http://10.0.2.2:8000/api
-  //   - iOS Simulator: http://localhost:8000/api
-  //   - Physical Device: http://YOUR_LOCAL_IP:8000/api (e.g., http://192.168.8.9:8000/api)
-  //
-  // Make sure your backend is running with: uvicorn app.main:app --host 0.0.0.0 --port 8000
-  // ============================================
+
+  // Base URL for the API
   static const String baseUrl = 'https://e-learning-backend-nkf7.onrender.com/api';
   
   // Storage Keys

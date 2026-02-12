@@ -1,82 +1,109 @@
+
 # E-Learning Platform MVP
 
-A comprehensive e-learning platform built with Flutter (mobile) and FastAPI (backend), featuring live classes, course management, and exams.
+A modern e-learning platform with a Flutter mobile app and FastAPI backend, supporting live classes, course management, exams, and AI-powered search (RAG).
 
-## 🎯 Project Overview
+## 🚀 Features
 
-This is an MVP (Minimum Viable Product) designed to demonstrate:
-- ✅ Live teaching capabilities
-- ✅ Course upload (video + PDF)
-- ✅ Exam creation and auto-grading
-- ✅ Clean architecture with modern tech stack
+**Teacher:**
+- Register/Login
+- Create and manage courses
+- Upload videos and PDFs
+- Create and auto-grade MCQ exams
+- View student results
+- Start live classes (Jitsi)
 
-## 🏗️ Architecture
+**Student:**
+- Register/Login
+- Browse and enroll in courses
+- Watch videos and read PDFs
+- Take exams and view grades
+- Join live classes
 
-```
-Flutter Mobile App
-      |
-      | REST API
-      |
-FastAPI Backend
- ├── Auth Service (JWT)
- ├── Course Service
- ├── Exam Service
- ├── Live Class Service
- |
-PostgreSQL Database
- |
-File Storage (Local/Cloud)
-```
+**AI & RAG:**
+- Semantic search over course content (PDFs)
+- AI-powered question answering (Groq)
+- Fast, memory-efficient vector search (ChromaDB)
+
+**Other:**
+- JWT authentication
+- Secure file uploads
+- Cloudinary and local storage support
+- Push notifications (Firebase)
 
 ## 🛠️ Technology Stack
 
-### Frontend (Flutter)
-- **Core**: Flutter, Dio, Riverpod
-- **Media**: video_player, file_picker, syncfusion_flutter_pdfviewer
-- **Live Class**: jitsi_meet_flutter_sdk
-- **Storage**: flutter_secure_storage
+- **Frontend:** Flutter, Riverpod, Dio, Jitsi SDK, video_player, file_picker
+- **Backend:** FastAPI, SQLAlchemy, Pydantic, ChromaDB, Sentence Transformers, Groq, PostgreSQL
+- **Storage:** Local filesystem, Cloudinary
+- **Notifications:** Firebase Cloud Messaging
 
-### Backend (FastAPI)
-- **Core**: FastAPI, SQLAlchemy, Pydantic, Python-JOSE, Passlib
-- **Database**: PostgreSQL
-- **Storage**: Local filesystem (can be upgraded to S3/Cloudinary)
+## 🔑 Backend Environment Variables
 
-## 📁 Project Structure
+Set these in `backend/.env` (see `.env.example` for template):
 
 ```
-biruk_challenge/
-├── backend/                 # FastAPI backend
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── auth.py
-│   │   │   ├── courses.py
-│   │   │   ├── exams.py
-│   │   │   └── live.py
-│   │   ├── core/
-│   │   │   ├── config.py
-│   │   │   ├── security.py
-│   │   │   └── database.py
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   │   └── file_service.py
-│   │   └── main.py
-│   ├── requirements.txt
-│   └── .env.example
-├── mobile/                  # Flutter app
-│   ├── lib/
-│   │   ├── main.dart
-│   │   ├── core/
-│   │   ├── features/
-│   │   │   ├── auth/
-│   │   │   ├── courses/
-│   │   │   ├── exams/
-│   │   │   └── live/
-│   │   └── providers/
-│   ├── pubspec.yaml
-│   └── README.md
-└── README.md
+# Database
+DATABASE_URL
+
+# Security
+SECRET_KEY
+ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES
+
+# File Storage
+UPLOAD_DIR
+MAX_FILE_SIZE_MB
+
+# Cloudinary (optional)
+CLOUDINARY_CLOUD_NAME
+CLOUDINARY_API_KEY
+CLOUDINARY_API_SECRET
+
+# Server
+HOST
+PORT
+
+# JaaS (Jitsi as a Service, for live classes)
+JAAS_APP_ID
+JAAS_API_KEY
+JAAS_PRIVATE_KEY
+
+# Firebase (Push notifications)
+FIREBASE_SERVICE_ACCOUNT_JSON
+
+# RAG / AI
+GROQ_API_KEY
 ```
+
+## ⚡ Quick Start
+
+### Backend
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # Edit .env with your values
+uvicorn app.main:app --reload
+```
+
+### Mobile
+```bash
+cd mobile
+flutter pub get
+flutter run
+```
+
+## 📚 API Docs
+
+Once the backend is running:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+## 📄 License
+
+MIT License
 
 ## 🚀 Quick Start
 
@@ -105,7 +132,6 @@ flutter run
 DATABASE_URL=postgresql://user:password@localhost/dbname
 SECRET_KEY=your-secret-key
 ALGORITHM=HS256
-UPLOAD_DIR=./uploads
 ```
 
 ## 📝 Features

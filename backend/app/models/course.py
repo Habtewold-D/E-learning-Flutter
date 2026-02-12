@@ -39,7 +39,7 @@ class CourseContent(Base):
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     type = Column(Enum(ContentType), nullable=False)
     title = Column(String, nullable=False)
-    url = Column(String, nullable=False)  # File path or external URL
+    url = Column(String, nullable=False)
 
     # Relationships
     course = relationship("Course", back_populates="contents")
